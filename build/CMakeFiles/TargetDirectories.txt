@@ -1,0 +1,6 @@
+/home/rddoga/Desktop/Aruco_from_scratch/build/CMakeFiles/rebuild_cache.dir
+/home/rddoga/Desktop/Aruco_from_scratch/build/CMakeFiles/Aruco_Markers.dir
+/home/rddoga/Desktop/Aruco_from_scratch/build/CMakeFiles/edit_cache.dir
+/home/rddoga/Desktop/Aruco_from_scratch/build/helpers/CMakeFiles/rebuild_cache.dir
+/home/rddoga/Desktop/Aruco_from_scratch/build/helpers/CMakeFiles/helpers.dir
+/home/rddoga/Desktop/Aruco_from_scratch/build/helpers/CMakeFiles/edit_cache.dir
