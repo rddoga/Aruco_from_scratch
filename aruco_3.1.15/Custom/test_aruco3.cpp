@@ -16,20 +16,13 @@
 using namespace std;
 //using namespace aruco;
 
-
-//For custom dection parameters
-cv::Ptr<cv::aruco::DetectorParameters> parameters = cv::aruco::DetectorParameters::create();
-//creating variables
-cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250); //Define dictionary
-    
-cv::Mat cameraMatrix, distCoeffs; 
-std::vector<int> markerIds; //Ids of the detected markers
-std::vector<std::vector<cv::Point2f>> markerCorners, rejectedCandidates; //All four corners of each marker (+ rejected markers)
+int imgSizeX = 1920, imgSizeY = 1080;
+aruco::MarkerDetector MDetector;
 
 
 int main(int argc, char** argv)
 {
-    int imgSizeX = 1920, imgSizeY = 1080, cpt = 0;
+    int cpt = 0;
     unsigned char* ptr_cam_frame; //permettra de prendre l'image
     int bytes_used, key = 0;
     TimerAvrg timerImg, timerFull, timerComputation;
@@ -85,13 +78,17 @@ int main(int argc, char** argv)
         //Copying image for showing the detected markers
         originalImage.copyTo(imageCopy);
         
-        //detecting markers
         
-
-        //Drawing markers to the output image (and the rejected candidates)
-        //if (markerIds.size() > 0){
-        //    cv::aruco::drawDetectedMarkers(imageCopy, markerCorners, markerIds);
-        //}
+        MDetector.setDictionary("ARUCO_MIP_16h3");
+        //detecting markers
+        vector<aruco::Marker> markers=MDetector.detect(imageCopy);
+        
+        if (markers.size() > 0){
+            for(size_t i=0;i<markers.size();i++){
+                //draw in the image
+                markers[i].draw(imageCopy, cv::Scalar(0, 0, 255), 2);
+            }
+        }
         
         key = cv::waitKey(1) & 0xFF;
         
