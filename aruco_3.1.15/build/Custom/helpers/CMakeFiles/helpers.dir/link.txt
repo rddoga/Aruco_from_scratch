@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC    -O0 -g3  -DDEBUG -D_DEBUG -DPRINT_DEBUG_MESSAGES  -shared -Wl,-soname,libhelpers.so -o libhelpers.so CMakeFiles/helpers.dir/src/i2c_helper.cpp.o CMakeFiles/helpers.dir/src/utils.cpp.o CMakeFiles/helpers.dir/src/v4l2_helper.cpp.o 

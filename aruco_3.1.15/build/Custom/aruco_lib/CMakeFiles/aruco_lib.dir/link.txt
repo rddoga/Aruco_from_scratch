@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC    -O0 -g3  -DDEBUG -D_DEBUG -DPRINT_DEBUG_MESSAGES  -shared -Wl,-soname,libaruco_lib.so -o libaruco_lib.so CMakeFiles/aruco_lib.dir/src/apriltag_quad_thresh.cpp.o CMakeFiles/aruco_lib.dir/src/aruco.cpp.o CMakeFiles/aruco_lib.dir/src/charuco.cpp.o CMakeFiles/aruco_lib.dir/src/dictionary.cpp.o CMakeFiles/aruco_lib.dir/src/zmaxheap.cpp.o 
