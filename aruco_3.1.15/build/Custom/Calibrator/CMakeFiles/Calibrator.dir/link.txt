@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC    -O0 -g3  -DDEBUG -D_DEBUG -DPRINT_DEBUG_MESSAGES  -shared -Wl,-soname,libCalibrator.so -o libCalibrator.so CMakeFiles/Calibrator.dir/src/calibrator.cpp.o 
