@@ -1,0 +1,10 @@
+
+libdir=/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build
+includedir=/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/src
+
+Name: aruco
+Description: ArUco: a minimal library for Augmented Reality applications based on OpenCv, uninstalled Version.
+Version: 3.1.15
+Requires: opencv >= 2.1.0
+Libs: -L${libdir} -laruco
+Cflags: -I${includedir}

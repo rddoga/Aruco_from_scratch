@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC    -O0 -g3  -DDEBUG -D_DEBUG -DPRINT_DEBUG_MESSAGES  -shared -Wl,-soname,libstereo-calibration-master.so -o libstereo-calibration-master.so CMakeFiles/stereo-calibration-master.dir/src/read_images.cpp.o CMakeFiles/stereo-calibration-master.dir/src/undistort_rectify.cpp.o 
