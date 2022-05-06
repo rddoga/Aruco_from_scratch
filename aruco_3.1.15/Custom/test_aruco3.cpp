@@ -22,6 +22,7 @@ int imgSizeX = 1920, imgSizeY = 1080;
 bool exiting = false; //For the image getter to know when to stop getting the image
 aruco::MarkerDetector MDetector; //Detector object
 aruco::CameraParameters camera; //Camera object for saving camera parameters
+float sum_img = 0.0f, sum_comp = 0.0f;
 
 /***************************************************/
 /*                                                 */
@@ -33,7 +34,6 @@ void FrameGetter(cv::Mat &originalImage)
 {
     TimerAvrg timerGetImage;
     clock_t start, stop;
-    float sum_img = 0.0f;
     
     unsigned char* ptr_cam_frame;
     int bytes_used, cpt = 0;
@@ -75,7 +75,7 @@ void FrameGetter(cv::Mat &originalImage)
 
     //std::cout << "Average image catch time                   : "<< timerGetImage.getAvrg() * 1000 << " ms /!\\ keep in mind this is done in a separate thread\n";
     std::cout << "Average image catch time (timer 2): " << (sum_img/cpt * 1000) << " ms  /!\\ keep in mind this is done in a separate thread" << std::endl;
-    cout << "Average base FPS (timer 2) : "<< (float)cpt/sum_img << " fps" << endl << endl;
+    cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
 }
 
 /**********************************************/
@@ -94,11 +94,11 @@ int main(int argc, char** argv)
         TimerAvrg timerFull, timerGetImage, timerComputation;
         
         clock_t start, stop;
-        float sum_comp = 0.0f;
-        float sum_img = 0.0f;
+        //float sum_img = 0.0f;
         
         //frame pointer
-        cv::Mat yuyv_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC2);
+        //cv::Mat yuyv_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC2);
+        
         //Original image, that gets the cam frame from the pointer
         cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
         //copied image, for printing the markers on the screen
@@ -106,7 +106,7 @@ int main(int argc, char** argv)
         
         //Set dictionary and detection mode
         MDetector.setDictionary("ARUCO_MIP_36h12");
-        MDetector.setDetectionMode(aruco::DM_VIDEO_FAST);
+        MDetector.setDetectionMode(aruco::DM_FAST);
         
         camera.readFromXMLFile("cam_calibration_3.yml");
             
@@ -117,16 +117,19 @@ int main(int argc, char** argv)
         }
             
         // multithreaded image getter
-        //std::thread t1(FrameGetter, std::ref(originalImage));
-        //std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::thread t1(FrameGetter, std::ref(originalImage));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
             
         while (key != 27){
             
             
-            timerFull.start();
-            start = clock();
-            timerGetImage.start();
+           // timerFull.start();
             
+            start = clock();
+            
+            //timerGetImage.start();
+            //////////////IF NOT MULTITHREADED////////////////////////
+            /*
             //getting cam frame
             if (helper_get_cam_frame(&ptr_cam_frame, &bytes_used) < 0)
             {
@@ -145,23 +148,24 @@ int main(int argc, char** argv)
                 break;
             }
 
-            timerGetImage.stop();
+            
             stop = clock();
+            timerGetImage.stop();
             cout << ((float) stop - start)/CLOCKS_PER_SEC << endl;
             sum_img += (((float) stop - start)/CLOCKS_PER_SEC);
+            */
             
-            // start timers
+            //timerImg.stop();
+            //timerComputation.start();
+            
             
             start = clock();   
-            
-        //    timerImg.stop();
-            timerComputation.start();
-           
             //Copying image for showing the detected markers
             originalImage.copyTo(imageCopy);
             
             
             //detecting markers
+            //vector<aruco::Marker> markers=MDetector.detect(imageCopy,camera,0.04);
             vector<aruco::Marker> markers=MDetector.detect(imageCopy);
             
             if (markers.size() > 0){
@@ -188,33 +192,31 @@ int main(int argc, char** argv)
             cv::imshow("Img", imageCopy);
             cpt++;
             
-            timerComputation.stop();
-            timerFull.stop();
+            
             
             stop = clock();
             float inter = ((float) stop - start)/CLOCKS_PER_SEC;
             cout << "main : " << inter << endl;
             sum_comp += inter;
+            
+            timerComputation.stop();
+            timerFull.stop();
         }
-       
-        // exiting program
-        if (helper_deinit_cam() < 0)
-            fprintf(stderr, "Failed to deinitialise camera : %m\n");
         
         exiting = true; //Indicate that we have to stop the image getter thread
-        //t1.join();
+        t1.join();
        
        // cout << "Average image catch time : " << timerImg.getAvrg() * 1000 << " ms" << endl;
         //cout << "Average image catch time (timer 2): " << (float)sum/cpt << " ms" << endl;
-        std::cout << "Average image catch time : "<< timerGetImage.getAvrg() * 1000 << " ms " << endl;
-        cout << "Average computation time : " << timerComputation.getAvrg() * 1000 << " ms"<< endl;
-        cout << "Average total time : " << timerFull.getAvrg() * 1000 << " ms" << endl;
-        cout << "Real average FPS : "<< 1./timerFull.getAvrg() << " fps" << endl;
+        //std::cout << "Average image catch time : "<< timerGetImage.getAvrg() * 1000 << " ms " << endl;
+        //cout << "Average computation time : " << timerComputation.getAvrg() * 1000 << " ms"<< endl;
+        //cout << "Average total time : " << timerFull.getAvrg() * 1000 << " ms" << endl;
+        //cout << "Real average FPS : "<< 1./timerFull.getAvrg() << " fps" << endl;
         
-        std::cout << "Average image catch time (timer 2): " << (sum_img/cpt) * 1000 << " ms  /!\\ keep in mind this is done in a separate thread" << std::endl;
-        cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
-        std::cout << "Average full time (timer 2): " << ((sum_comp+sum_img)/cpt) * 1000 << " ms" << std::endl;
-        cout << "Real average FPS (timer 2) : "<< cpt/(sum_comp+sum_img) << " fps" << endl << endl;
+        //std::cout << "Average image catch time (timer 2): " << (sum_img/cpt) * 1000 << " ms  /!\\ keep in mind this is done in a separate thread" << std::endl;
+        //cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
+        std::cout << "Average full time (timer 2): " << ((sum_comp)/cpt) * 1000 << " ms" << std::endl;
+        cout << "Real average FPS (timer 2) : "<< cpt/(sum_comp) << " fps" << endl << endl;
         
         cout << "MArker catch frequency : " << (float)Mdetected/cpt << endl;
     }
