@@ -14,6 +14,7 @@ set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "../Custom"
   "/usr/local/include/opencv4"
   "../3rdparty/eigen3"
+  "../src"
   "../Custom/aruco_lib/include"
   )
 

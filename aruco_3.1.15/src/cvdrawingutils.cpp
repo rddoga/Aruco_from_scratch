@@ -20,6 +20,40 @@ Copyright 2020 Rafael Muñoz Salinas. All rights reserved.
 using namespace cv;
 namespace aruco
 {
+
+//ADDED CUSTOM FUNCTION
+void CvDrawingUtils::drawXYcross(cv::Mat& Image, const CameraParameters& CP, const cv::Mat& Rvec, const cv::Mat& Tvec,
+                                   float axis_size, int lineSize)
+{
+       Mat objectPoints(5, 3, CV_32FC1);
+       objectPoints.at<float>(0, 0) = 0;
+       objectPoints.at<float>(0, 1) = 0;
+       objectPoints.at<float>(0, 2) = 0;
+       objectPoints.at<float>(1, 0) = axis_size;
+       objectPoints.at<float>(1, 1) = 0;
+       objectPoints.at<float>(1, 2) = 0;
+       objectPoints.at<float>(2, 0) = 0;
+       objectPoints.at<float>(2, 1) = axis_size;
+       objectPoints.at<float>(2, 2) = 0;
+       objectPoints.at<float>(3, 0) = -axis_size;
+       objectPoints.at<float>(3, 1) = 0;
+       objectPoints.at<float>(3, 2) = 0;
+       objectPoints.at<float>(4, 0) = 0;
+       objectPoints.at<float>(4, 1) = -axis_size;
+       objectPoints.at<float>(4, 2) = 0;
+       
+
+       std::vector<Point2f> imagePoints;
+       cv::projectPoints(objectPoints, Rvec, Tvec, CP.CameraMatrix, CP.Distorsion, imagePoints);
+       // draw lines of different colours
+       cv::line(Image, imagePoints[0], imagePoints[1], Scalar(0, 255, 0, 255), lineSize);
+       cv::line(Image, imagePoints[0], imagePoints[2], Scalar(0, 255, 0, 255), lineSize);
+       cv::line(Image, imagePoints[0], imagePoints[3], Scalar(0, 255, 0, 255), lineSize);
+       cv::line(Image, imagePoints[0], imagePoints[4], Scalar(0, 255, 0, 255), lineSize);
+}
+
+
+
 void CvDrawingUtils::draw3dAxis(cv::Mat& Image, const CameraParameters& CP, const cv::Mat& Rvec,
                                    const cv::Mat& Tvec, float axis_size)
    {

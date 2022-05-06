@@ -13,9 +13,10 @@
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/src/CMakeFiles/install/local.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/src/CMakeFiles/install.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/install/strip.dir
-/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/install.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/rebuild_cache.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/edit_cache.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/install.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/Aruco3_Calib.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/Aruco_Board.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/list_install_components.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/CMakeFiles/Aruco3_Markers.dir
@@ -38,3 +39,10 @@
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/aruco_lib/CMakeFiles/rebuild_cache.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/aruco_lib/CMakeFiles/list_install_components.dir
 /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/aruco_lib/CMakeFiles/install/local.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/Calibrator/CMakeFiles/install/strip.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/Calibrator/CMakeFiles/edit_cache.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/Calibrator/CMakeFiles/Calibrator.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/Calibrator/CMakeFiles/rebuild_cache.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/Calibrator/CMakeFiles/list_install_components.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/Calibrator/CMakeFiles/install/local.dir
+/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/Calibrator/CMakeFiles/install.dir

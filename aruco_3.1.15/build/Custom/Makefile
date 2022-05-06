@@ -68,18 +68,6 @@ install/strip/fast: preinstall/fast
 	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
 .PHONY : install/strip/fast
 
-# Special rule for the target install
-install: preinstall
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
-	/usr/bin/cmake -P cmake_install.cmake
-.PHONY : install
-
-# Special rule for the target install
-install/fast: preinstall/fast
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
-	/usr/bin/cmake -P cmake_install.cmake
-.PHONY : install/fast
-
 # Special rule for the target rebuild_cache
 rebuild_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
@@ -101,6 +89,18 @@ edit_cache:
 edit_cache/fast: edit_cache
 
 .PHONY : edit_cache/fast
+
+# Special rule for the target install
+install: preinstall
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
+	/usr/bin/cmake -P cmake_install.cmake
+.PHONY : install
+
+# Special rule for the target install
+install/fast: preinstall/fast
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
+	/usr/bin/cmake -P cmake_install.cmake
+.PHONY : install/fast
 
 # Special rule for the target list_install_components
 list_install_components:
@@ -155,6 +155,21 @@ preinstall/fast:
 depend:
 	cd /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
+
+# Convenience name for target.
+Custom/CMakeFiles/Aruco3_Calib.dir/rule:
+	cd /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build && $(MAKE) -f CMakeFiles/Makefile2 Custom/CMakeFiles/Aruco3_Calib.dir/rule
+.PHONY : Custom/CMakeFiles/Aruco3_Calib.dir/rule
+
+# Convenience name for target.
+Aruco3_Calib: Custom/CMakeFiles/Aruco3_Calib.dir/rule
+
+.PHONY : Aruco3_Calib
+
+# fast build rule for target.
+Aruco3_Calib/fast:
+	cd /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build && $(MAKE) -f Custom/CMakeFiles/Aruco3_Calib.dir/build.make Custom/CMakeFiles/Aruco3_Calib.dir/build
+.PHONY : Aruco3_Calib/fast
 
 # Convenience name for target.
 Custom/CMakeFiles/Aruco_Board.dir/rule:
@@ -245,6 +260,33 @@ Creation_board: Custom/CMakeFiles/Creation_board.dir/rule
 Creation_board/fast:
 	cd /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build && $(MAKE) -f Custom/CMakeFiles/Creation_board.dir/build.make Custom/CMakeFiles/Creation_board.dir/build
 .PHONY : Creation_board/fast
+
+aruco_calibration.o: aruco_calibration.cpp.o
+
+.PHONY : aruco_calibration.o
+
+# target to build an object file
+aruco_calibration.cpp.o:
+	cd /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build && $(MAKE) -f Custom/CMakeFiles/Aruco3_Calib.dir/build.make Custom/CMakeFiles/Aruco3_Calib.dir/aruco_calibration.cpp.o
+.PHONY : aruco_calibration.cpp.o
+
+aruco_calibration.i: aruco_calibration.cpp.i
+
+.PHONY : aruco_calibration.i
+
+# target to preprocess a source file
+aruco_calibration.cpp.i:
+	cd /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build && $(MAKE) -f Custom/CMakeFiles/Aruco3_Calib.dir/build.make Custom/CMakeFiles/Aruco3_Calib.dir/aruco_calibration.cpp.i
+.PHONY : aruco_calibration.cpp.i
+
+aruco_calibration.s: aruco_calibration.cpp.s
+
+.PHONY : aruco_calibration.s
+
+# target to generate assembly for a file
+aruco_calibration.cpp.s:
+	cd /home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build && $(MAKE) -f Custom/CMakeFiles/Aruco3_Calib.dir/build.make Custom/CMakeFiles/Aruco3_Calib.dir/aruco_calibration.cpp.s
+.PHONY : aruco_calibration.cpp.s
 
 calibration_camera.o: calibration_camera.cpp.o
 
@@ -415,9 +457,10 @@ help:
 	@echo "... clean"
 	@echo "... depend"
 	@echo "... install/strip"
-	@echo "... install"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
+	@echo "... install"
+	@echo "... Aruco3_Calib"
 	@echo "... Aruco_Board"
 	@echo "... list_install_components"
 	@echo "... Aruco3_Markers"
@@ -426,6 +469,9 @@ help:
 	@echo "... Calib_camera"
 	@echo "... Creation_markers"
 	@echo "... Creation_board"
+	@echo "... aruco_calibration.o"
+	@echo "... aruco_calibration.i"
+	@echo "... aruco_calibration.s"
 	@echo "... calibration_camera.o"
 	@echo "... calibration_camera.i"
 	@echo "... calibration_camera.s"

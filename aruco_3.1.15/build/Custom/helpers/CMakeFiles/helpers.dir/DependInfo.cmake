@@ -16,6 +16,7 @@ set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "../Custom/helpers"
   "/usr/local/include/opencv4"
   "../3rdparty/eigen3"
+  "../src"
   "../Custom/helpers/include"
   )
 

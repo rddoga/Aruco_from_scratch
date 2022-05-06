@@ -157,8 +157,8 @@ int main(int argc, char** argv)
         calibrator.setParams(cv::Size(imgSizeX, imgSizeY), 0.04, "");
 
         // set specific parameters for this configuration
-        TheMarkerDetector.setDictionary("ARUCO_MIP_16h3");
-        TheMarkerDetector.setDetectionMode(aruco::DM_FAST);
+        TheMarkerDetector.setDictionary("ARUCO_MIP_36h12");
+        TheMarkerDetector.setDetectionMode(aruco::DM_NORMAL);
 
         TimerAvrg timerFull;
         TimerAvrg timerDetect;
@@ -209,7 +209,7 @@ int main(int argc, char** argv)
         aruco::CameraParameters camp;
         if (calibrator.getCalibrationResults(camp))
         {
-            camp.saveToFile("cam_calibration.yml");
+            camp.saveToFile("cam_calibration_3.yml");
             cout << "results saved to cam_calibration.yml\n";
         }
         else

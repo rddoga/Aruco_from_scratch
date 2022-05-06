@@ -9,6 +9,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeCache.txt"
   "../CMakeLists.txt"
   "../Custom/CMakeLists.txt"
+  "../Custom/Calibrator/CMakeLists.txt"
   "../Custom/aruco_lib/CMakeLists.txt"
   "../Custom/helpers/CMakeLists.txt"
   "CMakeFiles/3.10.2/CMakeCCompiler.cmake"
@@ -65,12 +66,14 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "Custom/CMakeFiles/CMakeDirectoryInformation.cmake"
   "Custom/helpers/CMakeFiles/CMakeDirectoryInformation.cmake"
   "Custom/aruco_lib/CMakeFiles/CMakeDirectoryInformation.cmake"
+  "Custom/Calibrator/CMakeFiles/CMakeDirectoryInformation.cmake"
   )
 
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/uninstall.dir/DependInfo.cmake"
   "src/CMakeFiles/aruco.dir/DependInfo.cmake"
+  "Custom/CMakeFiles/Aruco3_Calib.dir/DependInfo.cmake"
   "Custom/CMakeFiles/Aruco_Board.dir/DependInfo.cmake"
   "Custom/CMakeFiles/Aruco3_Markers.dir/DependInfo.cmake"
   "Custom/CMakeFiles/Aruco_Markers.dir/DependInfo.cmake"
@@ -79,4 +82,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "Custom/CMakeFiles/Creation_board.dir/DependInfo.cmake"
   "Custom/helpers/CMakeFiles/helpers.dir/DependInfo.cmake"
   "Custom/aruco_lib/CMakeFiles/aruco_lib.dir/DependInfo.cmake"
+  "Custom/Calibrator/CMakeFiles/Calibrator.dir/DependInfo.cmake"
   )

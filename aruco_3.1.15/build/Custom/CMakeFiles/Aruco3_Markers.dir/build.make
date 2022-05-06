@@ -91,7 +91,7 @@ Aruco3_Markers_EXTERNAL_OBJECTS =
 Custom/Aruco3_Markers: Custom/CMakeFiles/Aruco3_Markers.dir/test_aruco3.cpp.o
 Custom/Aruco3_Markers: Custom/CMakeFiles/Aruco3_Markers.dir/build.make
 Custom/Aruco3_Markers: Custom/helpers/libhelpers.so
-Custom/Aruco3_Markers: Custom/aruco_lib/libaruco_lib.so
+Custom/Aruco3_Markers: src/libaruco.so.3.1.15
 Custom/Aruco3_Markers: /usr/local/lib/libopencv_calib3d.so.4.5.5
 Custom/Aruco3_Markers: /usr/local/lib/libopencv_highgui.so.4.5.5
 Custom/Aruco3_Markers: /usr/local/lib/libopencv_features2d.so.4.5.5
