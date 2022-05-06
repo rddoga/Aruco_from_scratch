@@ -183,6 +183,19 @@ aruco/fast:
 .PHONY : aruco/fast
 
 #=============================================================================
+# Target rules for targets named Aruco3_Calib
+
+# Build rule for target.
+Aruco3_Calib: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 Aruco3_Calib
+.PHONY : Aruco3_Calib
+
+# fast build rule for target.
+Aruco3_Calib/fast:
+	$(MAKE) -f Custom/CMakeFiles/Aruco3_Calib.dir/build.make Custom/CMakeFiles/Aruco3_Calib.dir/build
+.PHONY : Aruco3_Calib/fast
+
+#=============================================================================
 # Target rules for targets named Aruco_Board
 
 # Build rule for target.
@@ -286,6 +299,19 @@ aruco_lib/fast:
 	$(MAKE) -f Custom/aruco_lib/CMakeFiles/aruco_lib.dir/build.make Custom/aruco_lib/CMakeFiles/aruco_lib.dir/build
 .PHONY : aruco_lib/fast
 
+#=============================================================================
+# Target rules for targets named Calibrator
+
+# Build rule for target.
+Calibrator: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 Calibrator
+.PHONY : Calibrator
+
+# fast build rule for target.
+Calibrator/fast:
+	$(MAKE) -f Custom/Calibrator/CMakeFiles/Calibrator.dir/build.make Custom/Calibrator/CMakeFiles/Calibrator.dir/build
+.PHONY : Calibrator/fast
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -300,6 +326,7 @@ help:
 	@echo "... install/local"
 	@echo "... install"
 	@echo "... aruco"
+	@echo "... Aruco3_Calib"
 	@echo "... Aruco_Board"
 	@echo "... Aruco3_Markers"
 	@echo "... Aruco_Markers"
@@ -308,6 +335,7 @@ help:
 	@echo "... Creation_board"
 	@echo "... helpers"
 	@echo "... aruco_lib"
+	@echo "... Calibrator"
 .PHONY : help
 
 

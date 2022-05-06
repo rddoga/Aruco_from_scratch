@@ -41,6 +41,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
   include("/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/helpers/cmake_install.cmake")
   include("/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/aruco_lib/cmake_install.cmake")
+  include("/home/rddoga/Desktop/Aruco_from_scratch/aruco_3.1.15/build/Custom/Calibrator/cmake_install.cmake")
 
 endif()
 

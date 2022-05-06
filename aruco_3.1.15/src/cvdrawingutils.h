@@ -27,7 +27,10 @@ namespace aruco
     class ARUCO_EXPORT CvDrawingUtils
     {
     public:
-
+        
+        //ADDED CUSTOM FUNCTION
+        static void drawXYcross(cv::Mat& Image, const CameraParameters& CP, const cv::Mat& Rvec, const cv::Mat& Tvec,
+                                   float axis_size, int lineSize=1);
         static void draw3dAxis(cv::Mat& Image, const CameraParameters& CP, const cv::Mat& Rvec, const cv::Mat& Tvec,
                                float axis_size);
         static void draw3dAxis(cv::Mat& Image, Marker& m, const CameraParameters& CP,int lineSize=1);
