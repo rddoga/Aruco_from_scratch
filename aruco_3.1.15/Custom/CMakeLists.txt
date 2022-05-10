@@ -23,6 +23,7 @@ add_executable(Creation_markers create_marker.cpp) # Pour créer et imprimer les
 add_executable(Creation_board create_board.cpp) # Pour créer une board de markers
 add_executable(Calib_camera calibration_camera.cpp)
 add_executable(Aruco3_Calib aruco_calibration.cpp) # pour tester calibration aruco 3
+add_executable(Aruco_MarkerMap test_MarkerMap.cpp) #tester les markermap
 
 target_link_libraries(Aruco_Markers PRIVATE         helpers  aruco_lib  opencv_calib3d  opencv_highgui)
 target_link_libraries(Aruco_Board PRIVATE           helpers  aruco_lib  opencv_calib3d  opencv_highgui)
@@ -31,5 +32,6 @@ target_link_libraries(Creation_board PRIVATE        aruco_lib  opencv_calib3d  o
 target_link_libraries(Calib_camera PRIVATE          helpers  aruco  opencv_calib3d  opencv_highgui)
 target_link_libraries(Aruco3_Markers PRIVATE        helpers  aruco  opencv_calib3d  opencv_highgui  ${THREADLIB})
 target_link_libraries(Aruco3_Calib PRIVATE          helpers  aruco  opencv_calib3d  opencv_highgui  Calibrator  ${THREADLIB})
+target_link_libraries(Aruco_MarkerMap PRIVATE       helpers  aruco  opencv_calib3d  opencv_highgui)
 
 #install(TARGETS Aruco_Markers Aruco3_Markers Creation_markers Calib_camera RUNTIME DESTINATION bin)
