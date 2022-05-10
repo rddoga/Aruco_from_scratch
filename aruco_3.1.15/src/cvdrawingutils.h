@@ -32,7 +32,7 @@ namespace aruco
         static void drawXYcross(cv::Mat& Image, const CameraParameters& CP, const cv::Mat& Rvec, const cv::Mat& Tvec,
                                    float axis_size, int lineSize=1);
         static void draw3dAxis(cv::Mat& Image, const CameraParameters& CP, const cv::Mat& Rvec, const cv::Mat& Tvec,
-                               float axis_size);
+                               float axis_size, int linesize=1);
         static void draw3dAxis(cv::Mat& Image, Marker& m, const CameraParameters& CP,int lineSize=1);
 
         static void draw3dCube(cv::Mat& Image, Marker& m, const CameraParameters& CP,int lineSize=1, bool setYperpendicular = false);
