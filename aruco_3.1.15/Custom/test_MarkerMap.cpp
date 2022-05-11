@@ -16,8 +16,10 @@ using namespace std;
 
 
 int imgSizeX = 1920, imgSizeY = 1080;
+aruco::MarkerMap MM;
 
 int main(int argc, char** argv)
 {
+    
     return 0;
 }
