@@ -1,7 +1,7 @@
 %YAML:1.0
 ---
 aruco-dictionary: ARUCO_MIP_16h3
-aruco-detectMode: DM_FAST #DM_NORMAL
+aruco-detectMode: DM_FAST #DM_NORMAL 
 aruco-cornerRefinementM: CORNER_LINES
 aruco-thresMethod: THRES_ADAPTIVE
 aruco-maxThreads: -1
@@ -10,7 +10,7 @@ aruco-lowResMarkerSize: 10
 aruco-minSize: 0.
 aruco-minSize_pix: -1
 aruco-enclosedMarker: 0
-aruco-NAttemptsAutoThresFix: 5
+aruco-NAttemptsAutoThresFix: 3
 aruco-AdaptiveThresWindowSize: -1
 aruco-ThresHold: 25
 aruco-AdaptiveThresWindowSize_range: 0
