@@ -30,17 +30,32 @@ int imgSizeX = 1920, imgSizeY = 1080;
 float zOffset = 350; //position of the tool cursor on the z axis (in the tool markermap basis). Value will be changed by trackbar
 
 bool exiting = false; //For the image getter to know when to stop getting the image
-bool OneMarkerValid = false;
-bool Calib_points = true; //Are we in calibration mode?
+bool OneMarkerValid = false; //Check if the tool markermap is found
+bool IsStaticSet = false; //Do we need to set static basis?
+bool definePlane = true; //Do we need to define a plane (i.e are we in static mode?)
+bool Calib_points = false; //Are we in calibration mode?
 bool Detect_points = false; //Are we in detection mode?
 bool RpressedOnce = false; //Knowing if we are registering a point or its error margin (in calibration mode)
 
 float sum_img = 0.0f, sum_comp = 0.0f;
 //vector< vector< cv::Point2f > > DrawnImgPoints; //Remembering drawn points
+
 vector< cv::Point2f > DrawnImgPoints; //Remembering drawn points
-vector< std::tuple< cv::Mat, double, double > > registeredPoints; //3d coordinates, error margin (circle), error margin in pixels (circle) of the registered points
 vector< cv::Point2f > imagePoint; //2d projected point on the image (of the current tool tip)
+//std::vector<cv::Point3d> planePoints;   // vector to hold plane points (if definedPlane is true)
+
+std::vector<cv::Point3d> planePoints;   // vector to hold plane points (if definedPlane is true)
+std::vector<cv::Point2f> DrawplanePoints;   // vector to hold 2D plane points for drawing (if definedPlane is true)
+const cv::Point3d upwardDirection = cv::Point3d(0, 0, 1); //For finding the upward direction
+
 cv::Mat Real_coordinates = cv::Mat(4, 1, CV_32FC1); //For the coordinates of the tool tip
+vector< std::tuple< cv::Mat, double, double > > registeredPoints; //3d coordinates, error margin (circle), error margin in pixels (circle) of the registered points
+
+cv::Mat rodrigued(3, 3, CV_32F);                    // master point rotation 3x3 matrix
+cv::Mat relativeRvec(1, 3, CV_32F);                 // master point rotation
+cv::Mat relativeTvec(1, 3, CV_32F);                 // master point location
+cv::Mat relativeRTmat(4, 4, CV_32F);                // master point homogeneous matrix
+
 
 aruco::MarkerDetector MDetector; //Detector object
 aruco::CameraParameters camParameters; //Camera object for saving camera parameters
@@ -114,15 +129,15 @@ void ParseConfig(const char *path, aruco::MarkerMap* mmap)
             continue;
         }
 
-        // getting detector configuration
-        if (strcmp(lineType, "detector_config") == 0)
+        /////////////// getting detector configuration (NOT USED, SLOWS DOWN APPLICATION (WHY??) )/////////////////
+        /*if (strcmp(lineType, "detector_config") == 0)
         {
             char *name = std::strtok(nullptr, ",; ()\n");
             MDetector.loadParamsFromFile(name);
             std::cout << "\tdetector config = " << name << "\n";
             continue;
-        }
-        /*
+        }*/
+       /*
         // getting is_static
         if (strcmp(lineType, "is_static") == 0 && markerMapConfigRelatives.size() == 0) // just check we did not provide relative markermaps
         {
@@ -209,8 +224,166 @@ void ParseConfig(const char *path, aruco::MarkerMap* mmap)
     }*/
 }
 
+//Normalise vectors
+void normaliseVec(cv::Point3d &p)
+{
+    p = p / cv::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+}
+
+////Set Static Basis
+void SetOrigin(const char &key, cv::Mat imageCopy)
+{
+    // print the needed messages on the image, depending on which state we are in
+    cv::putText(imageCopy, "Static mode, press O to", cv::Point(5, 50), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 230, 0), 2);
+    
+    if (definePlane && planePoints.size() == 0)
+        cv::putText(imageCopy, "Place origin", cv::Point(5, 100), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 230, 0), 2);
+    else if (definePlane && planePoints.size() == 1)
+        cv::putText(imageCopy, "Place x axis", cv::Point(5, 100), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 230, 0), 2);
+    else if (definePlane && planePoints.size() == 2)
+        cv::putText(imageCopy, "Place y axis", cv::Point(5, 100), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 230, 0), 2);
+    
+    
+    /////////Check first if we can find the tool markermap
+    if(OneMarkerValid)
+    {
+        //3D coordinates in the tool markermap basis
+        cv::Mat objectPoint(1, 3, CV_32FC1);
+
+        objectPoint.at<float>(0, 0) = 0;
+        objectPoint.at<float>(0, 1) = 0;
+        objectPoint.at<float>(0, 2) = -zOffset; //for translating the tool tip on the z axis as needed
+        
+        //Project the 3d points in 2d
+        std::vector<cv::Point2f> imgPoint;
+        cv::projectPoints(objectPoint, MMTracker.getRvec(), MMTracker.getTvec(), camParameters.CameraMatrix, camParameters.Distorsion, imgPoint); 
+            
+            
+        // register origin when R pressed
+        if (key == 'o' || key == 'O')
+        {
+            //For having a 3 channels Mat (instead of 4) of the 3d coordinates of the points (in the camera basis)
+            cv::Point3d coordinates;
+            coordinates.x = Real_coordinates.at<float>(0, 0);
+            coordinates.y = Real_coordinates.at<float>(1, 0);
+            coordinates.z = Real_coordinates.at<float>(2, 0);
+
+            //Saving 2D point
+            DrawplanePoints.push_back(imgPoint.at(0));
+            
+            //Saving 3D current point (in the CAMERA basis) 
+            planePoints.push_back(coordinates);
+            
+            if (definePlane && planePoints.size() == 1)
+            {
+                
+            }
+            else if (definePlane && planePoints.size() == 2)
+            {
+
+            }
+            else if (definePlane && planePoints.size() >= 3)
+            {
+                cv::Point3d Xvec = (planePoints[1] - planePoints[0]); // x given vector
+                normaliseVec(Xvec);
+                cout << Xvec << endl;
+                cv::Point3d Yvec = (planePoints[2] - planePoints[0]); // y given vector, for now y is coplanar with x but not necessarily orthogonal
+                normaliseVec(Yvec);
+                cout << Yvec << endl;
+                cv::Point3d Zvec = Xvec.cross(Yvec);                  // z normal vector to x and y
+                normaliseVec(Zvec);
+                cout << Zvec << endl;
+                cv::Point3d correctedY = Xvec.cross(Zvec);            // new y vector normal to x and z so that they are all perpendicular
+                normaliseVec(correctedY);
+                cout << correctedY << endl;
+                
+                // explanation here : https://math.stackexchange.com/questions/1246679/expression-of-rotation-matrix-from-two-vectors
+                cv::Point3d n = Xvec.cross(correctedY);
+                normaliseVec(n);
+                cout << n << endl;
+                
+                //cv::Point3d n = Zvec;?????????
+                
+                // change n direction depending on the one we registered while placing the first point
+                double dotn = n.dot(upwardDirection);
+                std::cout << dotn << "\n";
+                if (dotn > 0)
+                    n = -n; // this to point upwards on a right handed basis
+                    
+                cv::Point3d nxa = n.cross(Xvec);
+                normaliseVec(nxa);
+                cout << nxa << endl;
+                
+                //cv::Point3d nxa = correctedY;????????
+                
+                
+                //Setting the Translation relative to the camera (being equal to the first registered point of the basis)
+                relativeTvec.at<float>(0) = planePoints[0].x;
+                relativeTvec.at<float>(1) = planePoints[0].y;
+                relativeTvec.at<float>(2) = planePoints[0].z;
+                
+                cv::Mat newRot(3, 3, CV_32F);
+                newRot.at<float>(0, 0) = Xvec.x;
+                newRot.at<float>(1, 0) = Xvec.y;
+                newRot.at<float>(2, 0) = Xvec.z;
+                newRot.at<float>(0, 1) = nxa.x;
+                newRot.at<float>(1, 1) = nxa.y;
+                newRot.at<float>(2, 1) = nxa.z;
+                newRot.at<float>(0, 2) = n.x;
+                newRot.at<float>(1, 2) = n.y;
+                newRot.at<float>(2, 2) = n.z;
+                
+                cv::Rodrigues(newRot, relativeRvec);
+                
+                 // get RT matrix
+                cv::Rodrigues(relativeRvec, rodrigued);
+                relativeRTmat.at<float>(0, 0) = rodrigued.at<float>(0, 0);
+                relativeRTmat.at<float>(1, 0) = rodrigued.at<float>(1, 0);
+                relativeRTmat.at<float>(2, 0) = rodrigued.at<float>(2, 0);
+                relativeRTmat.at<float>(3, 0) = 0;
+                relativeRTmat.at<float>(0, 1) = rodrigued.at<float>(0, 1);
+                relativeRTmat.at<float>(1, 1) = rodrigued.at<float>(1, 1);
+                relativeRTmat.at<float>(2, 1) = rodrigued.at<float>(2, 1);
+                relativeRTmat.at<float>(3, 1) = 0;
+                relativeRTmat.at<float>(0, 2) = rodrigued.at<float>(0, 2);
+                relativeRTmat.at<float>(1, 2) = rodrigued.at<float>(1, 2);
+                relativeRTmat.at<float>(2, 2) = rodrigued.at<float>(2, 2);
+                relativeRTmat.at<float>(3, 2) = 0;
+                relativeRTmat.at<float>(0, 3) = relativeTvec.at<float>(0);
+                relativeRTmat.at<float>(1, 3) = relativeTvec.at<float>(1);
+                relativeRTmat.at<float>(2, 3) = relativeTvec.at<float>(2);
+                relativeRTmat.at<float>(3, 3) = 1;
+
+                
+                IsStaticSet = true;
+                Calib_points = true;
+            }
+        }
+        
+            
+        if (definePlane && planePoints.size() == 1)
+        {
+            cv::drawMarker(imageCopy, DrawplanePoints.at(0), cv::Scalar(0, 255, 0), cv::MARKER_TILTED_CROSS, 20, 2 );//Draw point as a cross
+            cv::line(imageCopy, DrawplanePoints.at(0), imgPoint.at(0), cv::Scalar(0, 165, 255), 2);
+        }
+        
+        else if (definePlane && planePoints.size() == 2)
+        {
+            cv::drawMarker(imageCopy, DrawplanePoints.at(0), cv::Scalar(0, 255, 0), cv::MARKER_TILTED_CROSS, 20, 2 );//Draw point as a cross
+            cv::line(imageCopy, DrawplanePoints.at(0), DrawplanePoints.at(1), cv::Scalar(0, 165, 255), 2);
+            cv::line(imageCopy, DrawplanePoints.at(0), imgPoint.at(0), cv::Scalar(0, 165, 255), 2);
+        }
+        else if (definePlane && planePoints.size() >= 3)
+        {
+            
+        }
+        
+    }
+}
+
+
 //For calibrating points
-void Calibration_Points(const char key)
+void Calibration_Points(const char &key)
 {
     if(key == 'r' | key == 'R'){
         
@@ -379,7 +552,7 @@ int main(int argc, char** argv)
 
         //Set dictionary and detection mode
         //MDetector.setDictionary("ARUCO_MIP_16h3");
-        //MDetector.setDetectionMode(aruco::DM_FAST);
+        MDetector.setDetectionMode(aruco::DM_FAST);
         
         //camParameters.readFromXMLFile("cam_calibration_3.yml");
 
@@ -486,22 +659,7 @@ int main(int argc, char** argv)
             
             key = cv::waitKey(1) & 0xFF;
             
-            if(key == 'd' | key == 'D')
-            {
-                if(Calib_points){
-                    Detect_points = true;
-                    Calib_points = false;
-                }
-            }
-            
-            if(key == 'c' | key == 'C')
-            {
-                if(Detect_points){
-                    Calib_points = true;
-                    Detect_points = false;
-                }
-            }
-            ///////DRAWING TOOL TIP AND AXIS EACH FRAME, AND GETTING 3D POSITION OF THE TOOL TIP
+            /////////////DRAWING TOOL TIP AND AXIS EACH FRAME, AND GETTING 3D POSITION OF THE TOOL TIP//////////////
             if(OneMarkerValid)
             {
                 //Draw tool axis
@@ -541,57 +699,100 @@ int main(int argc, char** argv)
                     cv::putText(imageCopy, R_coordinates, cv::Point(5, 150), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 230, 0), 2);
                 }
             }
-              
-            //////IF WE ARE IN CALIBRATION MODE
-            if(Calib_points)
+            
+            /////////////////IF THE ORIGIN IS NOT SET, SET IT ////////////////////////
+            if(!IsStaticSet)
             {
-                cv::putText(imageCopy, "Calibration Mode", cv::Point(5, 50), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 255), 2);
+                SetOrigin(key, imageCopy);
+            }
+            
+            /////////////////IF THE ORIGIN IS SET, DO THE CALIBRATION / DETECTION ///////////////////
+            if(IsStaticSet)
+            {
+                ///////////DRAW THE BASIS OF THE WORKING SURFACE///////////
                 
-                if(OneMarkerValid)
+                //First draw origin
+                cv::Mat Origin = cv::Mat(1, 3, CV_32FC1);
+                Origin.at<float>(0, 0) = 0.;
+                Origin.at<float>(0, 1) = 0.;
+                Origin.at<float>(0, 2) = 0.;
+
+                //::Mat X1 = transp(relativeRTmat) * cv::Mat(1,0,0,1);
+                
+                vector< cv::Point2f > imgPoint;
+                cv::projectPoints(Origin, relativeRvec, relativeTvec, camParameters.CameraMatrix, camParameters.Distorsion, imgPoint); //Project the 3d points in 2d
+                cv::drawMarker(imageCopy, imgPoint.at(0), cv::Scalar(0, 255, 255), cv::MARKER_TILTED_CROSS, 20, 2 ); //Draw origin of other basis
+                //cv::line(imageCopy, DrawplanePoints.at(0), DrawplanePoints.at(1), cv::Scalar(0, 165, 255), 2);
+                
+                
+                ///////CHANGE MODE IF THE ORIGIN WAS SET
+                
+                if(key == 'd' | key == 'D')
                 {
-                    Calibration_Points(key);
-                    
-                    //Drawing the moving error circle of the current point
-                    if(RpressedOnce)
-                    {
-                        vector <cv::Point2f> center;
-                        center.push_back(DrawnImgPoints.back() );
-                        vector <cv::Point2f> border;
-                        border.push_back(imagePoint.at(1) );
-                        
-                        //Finding the circle radius
-                        float radius = norm(center, border, cv::NORM_L2);
-                        
-                        //Draw circle around the last point, following the tool tip
-                        cv::circle(imageCopy, DrawnImgPoints.back(), radius, cv::Scalar(0, 0, 255), 2);
+                    if(Calib_points){
+                        Detect_points = true;
+                        Calib_points = false;
                     }
-                    
                 }
-            }
-            
-            /////////////IF WE ARE IN DETECTION MODE
-            if(Detect_points)
-            {
-                cv::putText(imageCopy, "Detection Mode", cv::Point(5, 50), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 255), 2);
-                if(OneMarkerValid)
+                
+                if(key == 'c' | key == 'C')
                 {
-                    Detection_Points(imageCopy);
+                    if(Detect_points){
+                        Calib_points = true;
+                        Detect_points = false;
+                    }
                 }
-            }
-            
-            //Drawing each point and error circle (each frame)
-            if(DrawnImgPoints.size() > 0)
-            {
-                for (int i=0; i < DrawnImgPoints.size(); i++){
-                    //aruco::CvDrawingUtils::drawXYcross(imageCopy, camParameters, markers[0].Rvec, markers[0].Tvec, 0.005);///2 * imgSizeX / 1920 /* adapting ui size to image size */  
-                    cv::drawMarker(imageCopy, DrawnImgPoints.at(i), cv::Scalar(0, 255, 0), cv::MARKER_TILTED_CROSS, 20, 2 );//Draw all the points as a cross
-                    //cv::line(imageCopy, DrawnImgPoints.at(i).at(0), DrawnImgPoints.at(i).at(1), cv::Scalar(0, 0, 255, 255), 1);
-                    if(std::get<2>(registeredPoints.at(i)) > 0.0f)
-                        cv::circle(imageCopy, DrawnImgPoints.at(i), std::get<2>(registeredPoints.at(i)), cv::Scalar(128, 0, 255), 2);
-                }
-            }/**/
-            
+                  
+                //////IF WE ARE IN CALIBRATION MODE
+                if(Calib_points)
+                {
+                    cv::putText(imageCopy, "Calibration Mode", cv::Point(5, 50), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 255), 2);
+                    
+                    if(OneMarkerValid)
+                    {
+                        Calibration_Points(key);
+                        
+                        //Drawing the moving error circle of the current point
+                        if(RpressedOnce)
+                        {
+                            vector <cv::Point2f> center;
+                            center.push_back(DrawnImgPoints.back() );
+                            vector <cv::Point2f> border;
+                            border.push_back(imagePoint.at(1) );
                             
+                            //Finding the circle radius
+                            float radius = norm(center, border, cv::NORM_L2);
+                            
+                            //Draw circle around the last point, following the tool tip
+                            cv::circle(imageCopy, DrawnImgPoints.back(), radius, cv::Scalar(0, 0, 255), 2);
+                        }
+                        
+                    }
+                }
+                
+                /////////////IF WE ARE IN DETECTION MODE
+                if(Detect_points)
+                {
+                    cv::putText(imageCopy, "Detection Mode", cv::Point(5, 50), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 255), 2);
+                    if(OneMarkerValid)
+                    {
+                        Detection_Points(imageCopy);
+                    }
+                }
+                
+                //Drawing each point and error circle (each frame)
+                if(DrawnImgPoints.size() > 0)
+                {
+                    for (int i=0; i < DrawnImgPoints.size(); i++){
+                        //aruco::CvDrawingUtils::drawXYcross(imageCopy, camParameters, markers[0].Rvec, markers[0].Tvec, 0.005);///2 * imgSizeX / 1920 /* adapting ui size to image size */  
+                        cv::drawMarker(imageCopy, DrawnImgPoints.at(i), cv::Scalar(0, 255, 0), cv::MARKER_TILTED_CROSS, 20, 2 );//Draw all the points as a cross
+                        //cv::line(imageCopy, DrawnImgPoints.at(i).at(0), DrawnImgPoints.at(i).at(1), cv::Scalar(0, 0, 255, 255), 1);
+                        if(std::get<2>(registeredPoints.at(i)) > 0.0f)
+                            cv::circle(imageCopy, DrawnImgPoints.at(i), std::get<2>(registeredPoints.at(i)), cv::Scalar(128, 0, 255), 2);
+                    }
+                }/**/
+                
+            }            
             //if(cpt%20 == 0)
             //    cout << "getting frame" << endl;
             
