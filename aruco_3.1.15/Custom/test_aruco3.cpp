@@ -7,9 +7,10 @@
 #define ENABLE_GPU_UPLOAD
 #endif
 
-#include "v4l2_helper.h"
-#include "utils.h"
-#include "i2c_helper.h"
+//#include "v4l2_helper.h"
+//#include "utils.h"
+//#include "i2c_helper.h"
+#include "Alvium_Camera.h"
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -35,7 +36,12 @@ using namespace std;
 /*                                                 */
 /***************************************************/
 
-int imgSizeX = 1920, imgSizeY = 1080;
+///Variables from the camera helpers files
+unsigned char* ptr_raw_frame;
+bool StartReceiving = false;
+
+
+int imgSizeX = 4024, imgSizeY = 3036;
 float zOffset = 350; //position of the tool cursor on the z axis (in the tool markermap basis). Value will be changed by trackbar
 
 bool exiting = false; //For the image getter to know when to stop getting the image
@@ -590,23 +596,22 @@ int main(int argc, char** argv)
     {
         aruco::MarkerMap* mmap = new aruco::MarkerMap; //Tool (main) MarkerMap
         aruco::MarkerMap* mmRelative = new aruco::MarkerMap; //Relative MarkerMap
-        
-        
+
          
         int cpt = 0, Mdetected = 0;
         unsigned char* ptr_cam_frame; //permettra de prendre l'image
         int bytes_used, key = -1, lastkey = -1;
-        TimerAvrg timerFull, timerGetImage, timerComputation;
+        //TimerAvrg timerFull, timerGetImage, timerComputation;
         //string posMarkerMapfile = "stacked.yml";
     
         clock_t start, stop;
         //float sum_img = 0.0f;
 
-        //frame pointer
-        cv::Mat yuyv_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC2);
+        //Image that gets data from the frame pointer
+        cv::Mat raw_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC1);
         
         //Original image, that gets the cam frame from the pointer
-        cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
+        //cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
         //copied image, for printing the markers on the screen
         cv::Mat imageCopy;
         //empty img used for displaying the trackbar
@@ -636,12 +641,16 @@ int main(int argc, char** argv)
         //Load configuration
         ParseConfig(argv[1], mmap, mmRelative);
         
-        //Initialise camera
+        
+        
+        /*//Initialise camera
         if(helper_init_cam("/dev/video0", imgSizeX, imgSizeY, V4L2_PIX_FMT_UYVY, IO_METHOD_USERPTR) < 0) // or V4L2_PIX_FMT_YUYV
         {
             cout << "Failed to open video" << endl;
             return -1;
-        }
+        }*/
+        
+        
 
 //Use opengl and cuda for speedup
 #if defined(ENABLE_GL_DISPLAY) && defined(ENABLE_GPU_UPLOAD)
@@ -679,21 +688,26 @@ int main(int argc, char** argv)
         // multithreaded image getter
         //std::thread t1(FrameGetter, std::ref(originalImage));
         //std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            
-            
-            
+           
+        //Startup and start image acquisition
+        VmbErrorType err = Open_and_Start_Acquisition();
+        if(err != VmbErrorSuccess){
+            throw "Openning / Start Acquisition error !";
+        }
+        
+                    
         ///////////////MAIN WHILE LOOP///////////////////
         while (key != 27){
             
             
             // timerFull.start();
             
-            start = clock();
+            //start = clock();
             
             //timerGetImage.start();
             //////////////IF NOT MULTITHREADED////////////////////////
             
-            //getting cam frame
+            /*//getting cam frame
             if (helper_get_cam_frame(&ptr_cam_frame, &bytes_used) < 0)
             {
                 fprintf(stderr, "Failed to get image : %m\n");
@@ -709,14 +723,15 @@ int main(int argc, char** argv)
             {
                 fprintf(stderr, "Failed to release image : %m\n");
                 break;
-            }
+            }*/
 
+            raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?)
             
-            stop = clock();
+            /*stop = clock();
             timerGetImage.stop();
             //cout << ((float) stop - start)/CLOCKS_PER_SEC << endl;
             sum_img += (((float) stop - start)/CLOCKS_PER_SEC);
-            /**/
+            */
             
             //timerImg.stop();
             //timerComputation.start();
@@ -724,7 +739,7 @@ int main(int argc, char** argv)
             
             start = clock();   
             //Copying image for showing the detected markers
-            originalImage.copyTo(imageCopy);
+            raw_frame.copyTo(imageCopy);
             
             
             //detecting markers
@@ -1021,21 +1036,30 @@ int main(int argc, char** argv)
             }            
             //if(cpt%20 == 0)
             //    cout << "getting frame" << endl;
-            
-            
-            //Show image
-            //cv::imshow("Tool", imageCopy);
-            //cv::imshow("Trackbars", TrackbarImg );
+
             
             cpt++;
             
-#if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
-            gpu_frame.upload(imageCopy);
-            cv::imshow("Tool", gpu_frame);
-#else
-            cv::imshow("Tool", imageCopy);
-#endif
             
+            if(StartReceiving){
+            
+                if(FrameObserver::total_time > 1.0f)
+                {
+                    FrameObserver::Print_FPS();
+                }
+
+                cv::Mat resized_down = cv::Mat(1080, 1920, CV_8UC1);
+                //resize down
+                cv::resize(imageCopy, resized_down, resized_down.size(), 0, 0, cv::INTER_LINEAR);
+                
+#if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
+                gpu_frame.upload(resized_down);
+                cv::imshow("Tool", gpu_frame);
+#else
+                cv::imshow("Tool", resized_down);
+#endif
+                
+            }   
 
             stop = clock();
             float inter = ((float) stop - start)/CLOCKS_PER_SEC;
@@ -1047,17 +1071,24 @@ int main(int argc, char** argv)
         }
         
         
-        // exiting program
+        /*// exiting program
         if (helper_deinit_cam() < 0)
-            fprintf(stderr, "Failed to deinitialise camera : %m\n");
+            fprintf(stderr, "Failed to deinitialise camera : %m\n");*/
         
-        exiting = true; //Indicate that we have to stop the image getter thread
+        //exiting = true; //Indicate that we have to stop the image getter thread
         //t1.join(); //Wait for the other thread to finish
         
         delete mmap; //delete the mmap pointer 
         delete mmRelative; //delete the mmRelative pointer 
         
         
+        //Stop image acquisition and shutdown camera and API
+        err = Stop_Acquisition_and_Close();
+        
+        
+        if(err != VmbErrorSuccess)
+            throw "Closing / Stop Acquisition error !";
+            
        // cout << "Average image catch time : " << timerImg.getAvrg() * 1000 << " ms" << endl;
         //cout << "Average image catch time (timer 2): " << (float)sum/cpt << " ms" << endl;
         //std::cout << "Average image catch time : "<< timerGetImage.getAvrg() * 1000 << " ms " << endl;
@@ -1065,8 +1096,8 @@ int main(int argc, char** argv)
         //cout << "Average total time : " << timerFull.getAvrg() * 1000 << " ms" << endl;
         //cout << "Real average FPS : "<< 1./timerFull.getAvrg() << " fps" << endl;
         
-        std::cout << "Average image catch time (timer 2): " << (sum_img/cpt) * 1000 << " ms  /!\\ keep in mind this is done in a separate thread" << std::endl;
-        cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
+        //std::cout << "Average image catch time (timer 2): " << (sum_img/cpt) * 1000 << " ms  /!\\ keep in mind this is done in a separate thread" << std::endl;
+        //cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
         std::cout << "Average computation time (timer 2): " << ((sum_comp)/cpt) * 1000 << " ms" << std::endl;
         
         std::cout << "Average full time (timer 2): " << ((sum_comp+sum_img)/cpt) * 1000 << " ms" << std::endl;
