@@ -187,10 +187,10 @@ int main(int argc, char** argv)
     
     //initialisation camera
     if(helper_init_cam("/dev/video0", imgSizeX, imgSizeY, V4L2_PIX_FMT_UYVY, IO_METHOD_USERPTR) < 0) // or V4L2_PIX_FMT_YUYV
-        {
-            cout << "Failed to open video" << endl;
-            return -1;
-        }
+    {
+        cout << "Failed to open video" << endl;
+        return -1;
+    }
         
     while (key != 27){
     
