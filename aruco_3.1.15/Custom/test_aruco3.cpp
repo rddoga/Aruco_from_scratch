@@ -1,11 +1,11 @@
 //Comment if needed
-#ifndef ENABLE_GL_DISPLAY
+/*#ifndef ENABLE_GL_DISPLAY
 #define ENABLE_GL_DISPLAY
 #endif
 
 #ifndef ENABLE_GPU_UPLOAD
 #define ENABLE_GPU_UPLOAD
-#endif
+#endif*/
 
 //#include "v4l2_helper.h"
 //#include "utils.h"
@@ -37,11 +37,11 @@ using namespace std;
 /***************************************************/
 
 ///Variables from the camera helpers files
-unsigned char* ptr_raw_frame;
-bool StartReceiving = false;
+//unsigned char* ptr_raw_frame;
+//bool StartReceiving = false;
 
 
-int imgSizeX = 4024, imgSizeY = 3036;
+int imgSizeX = 1920, imgSizeY = 1080;
 float zOffset = 350; //position of the tool cursor on the z axis (in the tool markermap basis). Value will be changed by trackbar
 
 bool exiting = false; //For the image getter to know when to stop getting the image
@@ -93,6 +93,24 @@ aruco::MarkerMapPoseTracker MMRelativeTracker; //Tracker for the relative merker
 /******************** FUNCTIONS ********************/
 /*                                                 */
 /***************************************************/
+
+
+
+//For handling cam Startup/Shutdown errors
+class Cam_Exception : public std::exception
+{
+    const char* cam_err;
+public:
+
+    Cam_Exception(const char* _cam_err) : cam_err(_cam_err) {}
+    
+    const char* what() const throw()
+    {
+        return cam_err;
+    }
+};
+
+
 
 /*
  * Load the configuration (MMap, Detector, Camera parameters...)
@@ -608,25 +626,31 @@ int main(int argc, char** argv)
         //float sum_img = 0.0f;
 
         //Image that gets data from the frame pointer
-        cv::Mat raw_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC1);
         
+        //NEW CAMERA
+        cv::Mat raw_frame = cv::Mat(3036, 4024, CV_8UC1);
+       
+        //OLD CAMERA
+        /*cv::Mat yuyv_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC2);
         //Original image, that gets the cam frame from the pointer
-        //cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
+        cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
         //copied image, for printing the markers on the screen
-        cv::Mat imageCopy;
+        cv::Mat imageCopy;*/
+        
+        
         //empty img used for displaying the trackbar
         cv::Mat TrackbarImg = cv::Mat::zeros(1, 500, CV_8UC1);
 
 
         //Set dictionary and detection mode
         //MDetector.setDictionary("ARUCO_MIP_16h3");
-        MDetector.setDetectionMode(aruco::DM_FAST);
+        MDetector.setDetectionMode(aruco::DM_NORMAL);
         
         //Changing manually the parameters of the detector
         aruco::MarkerDetector::Params &params= MDetector.getParameters();
         
         params.cornerRefinementM = aruco::CORNER_LINES; //Corner refinement method
-        params.maxThreads = 1; //Max threads used in parallel
+        params.maxThreads = -1; //Max threads used in parallel
         params.lowResMarkerSize = 5; //minimum size of a marker in the low resolution image
         params.NAttemptsAutoThresFix = 2; //number of times that tries a random threshold in case of THRES_AUTO_FIXED
         params.error_correction_rate = 1; 
@@ -642,7 +666,7 @@ int main(int argc, char** argv)
         ParseConfig(argv[1], mmap, mmRelative);
         
         
-        
+        //OLD CAMERA
         /*//Initialise camera
         if(helper_init_cam("/dev/video0", imgSizeX, imgSizeY, V4L2_PIX_FMT_UYVY, IO_METHOD_USERPTR) < 0) // or V4L2_PIX_FMT_YUYV
         {
@@ -689,11 +713,11 @@ int main(int argc, char** argv)
         //std::thread t1(FrameGetter, std::ref(originalImage));
         //std::this_thread::sleep_for(std::chrono::milliseconds(200));
            
+        //NEW CAMERA
         //Startup and start image acquisition
-        VmbErrorType err = Open_and_Start_Acquisition();
-        if(err != VmbErrorSuccess){
-            throw "Openning / Start Acquisition error !";
-        }
+        if(VmbErrorSuccess != Open_and_Start_Acquisition() ){
+            throw Cam_Exception("Openning / Start Acquisition error !");
+        }/**/
         
                     
         ///////////////MAIN WHILE LOOP///////////////////
@@ -707,6 +731,7 @@ int main(int argc, char** argv)
             //timerGetImage.start();
             //////////////IF NOT MULTITHREADED////////////////////////
             
+            // OLD CAMERA
             /*//getting cam frame
             if (helper_get_cam_frame(&ptr_cam_frame, &bytes_used) < 0)
             {
@@ -724,24 +749,43 @@ int main(int argc, char** argv)
                 fprintf(stderr, "Failed to release image : %m\n");
                 break;
             }*/
-
-            raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?)
             
-            /*stop = clock();
-            timerGetImage.stop();
+            key = cv::waitKey(1) & 0xFF; //Registering pressed key
+            
+            //NEW CAMERA
+            if(!StartReceiving){//Check if we started receiving
+                continue;
+            }
+             
+            raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?)/**/
+            
+            
+            /*OLD CAMERA
+            stop = clock();
+            //timerGetImage.stop();
             //cout << ((float) stop - start)/CLOCKS_PER_SEC << endl;
-            sum_img += (((float) stop - start)/CLOCKS_PER_SEC);
-            */
+            sum_img += (((float) stop - start)/CLOCKS_PER_SEC);*/
+            
             
             //timerImg.stop();
             //timerComputation.start();
             
             
-            start = clock();   
+            start = clock();
+            
+            //OLD CAMERA   
             //Copying image for showing the detected markers
-            raw_frame.copyTo(imageCopy);
+            //originalImage.copyTo(imageCopy);
             
-            
+            //NEW CAMERA
+            //Copy and resize image to the right format
+            cv::Mat imgtmp = cv::Mat(imgSizeY, imgSizeX, CV_8UC1), imageCopy = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
+
+            //resize down for printing the image
+            cv::resize(raw_frame, imgtmp, imgtmp.size(), 0, 0, cv::INTER_NEAREST);
+
+            cv::cvtColor(imgtmp, imageCopy, cv::COLOR_GRAY2BGR ); // for printing colored features on the image
+
             //detecting markers
             vector<aruco::Marker> markers=MDetector.detect(imageCopy,camParameters,0.04);
             //vector<aruco::Marker> markers=MDetector.detect(imageCopy);
@@ -780,7 +824,7 @@ int main(int argc, char** argv)
                 //cout<<m.Rvec<<" "<<m.Tvec<<endl;
             }*/
             
-            key = cv::waitKey(1) & 0xFF;
+            
             //For Preventing registration of many points at once if a key is pressed too long
             if(lastkey == key && key != -1){
                 lastkey = key;
@@ -1040,26 +1084,18 @@ int main(int argc, char** argv)
             
             cpt++;
             
+            //NEW CAMERA
+            /*if(FrameObserver::total_time > 1.0f)
+            {
+                FrameObserver::Print_FPS();
+            }*/
             
-            if(StartReceiving){
-            
-                if(FrameObserver::total_time > 1.0f)
-                {
-                    FrameObserver::Print_FPS();
-                }
-
-                cv::Mat resized_down = cv::Mat(1080, 1920, CV_8UC1);
-                //resize down
-                cv::resize(imageCopy, resized_down, resized_down.size(), 0, 0, cv::INTER_LINEAR);
-                
 #if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
-                gpu_frame.upload(resized_down);
-                cv::imshow("Tool", gpu_frame);
+            gpu_frame.upload(imageCopy);//resized_down
+            cv::imshow("Tool", gpu_frame);
 #else
-                cv::imshow("Tool", resized_down);
-#endif
-                
-            }   
+            cv::imshow("Tool", imageCopy);//resized_down
+#endif   
 
             stop = clock();
             float inter = ((float) stop - start)/CLOCKS_PER_SEC;
@@ -1081,13 +1117,10 @@ int main(int argc, char** argv)
         delete mmap; //delete the mmap pointer 
         delete mmRelative; //delete the mmRelative pointer 
         
-        
+        //NEW CAMERA
         //Stop image acquisition and shutdown camera and API
-        err = Stop_Acquisition_and_Close();
-        
-        
-        if(err != VmbErrorSuccess)
-            throw "Closing / Stop Acquisition error !";
+        if(VmbErrorSuccess != Stop_Acquisition_and_Close() )
+            throw Cam_Exception("Closing / Stop Acquisition error !");/**/
             
        // cout << "Average image catch time : " << timerImg.getAvrg() * 1000 << " ms" << endl;
         //cout << "Average image catch time (timer 2): " << (float)sum/cpt << " ms" << endl;
@@ -1107,7 +1140,7 @@ int main(int argc, char** argv)
     }
     catch(std::exception& ex)
     {
-        cout << "Exception :" << ex.what() << "\n";
+        cout << "Exception : " << ex.what() << "\n";
     }
     return 0;
     //printf("hello\n");

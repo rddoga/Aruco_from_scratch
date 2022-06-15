@@ -56,8 +56,8 @@ target_link_libraries(Aruco_Board PRIVATE           helpers  aruco_lib  opencv_c
 target_link_libraries(Creation_markers PRIVATE      aruco_lib  opencv_calib3d  opencv_highgui)
 target_link_libraries(Creation_board PRIVATE        aruco_lib  opencv_calib3d  opencv_highgui)
 target_link_libraries(Calib_camera PRIVATE          helpers  aruco  opencv_calib3d  opencv_highgui)
-target_link_libraries(Aruco3_Markers PRIVATE        Alvium_Camera_Helpers  ${VimbaC_lib}  ${VimbaCPP_lib}  aruco  opencv_calib3d  opencv_highgui  )
+target_link_libraries(Aruco3_Markers PRIVATE        Alvium_Camera_Helpers  ${VimbaC_lib}  ${VimbaCPP_lib}  aruco  opencv_calib3d  opencv_highgui  ${THREADLIB} )
 target_link_libraries(Aruco3_Calib PRIVATE          helpers  aruco  opencv_calib3d  opencv_highgui  Calibrator  ${THREADLIB})
-target_link_libraries(NewCamCalib PRIVATE           Alvium_Camera_Helpers  ${VimbaC_lib}  ${VimbaCPP_lib}  aruco  opencv_calib3d  opencv_highgui  Calibrator)
+target_link_libraries(NewCamCalib PRIVATE           Alvium_Camera_Helpers  ${VimbaC_lib}  ${VimbaCPP_lib}  aruco  opencv_calib3d  opencv_highgui  Calibrator  ${THREADLIB})
 
 #install(TARGETS Aruco_Markers Aruco3_Markers Creation_markers Calib_camera RUNTIME DESTINATION bin)
