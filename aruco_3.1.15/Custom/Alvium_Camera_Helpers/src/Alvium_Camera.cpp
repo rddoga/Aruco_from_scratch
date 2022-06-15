@@ -24,7 +24,7 @@ CameraPtrVector cameras ;
 // A list of known cameras
 
 //cout << "creating frame vector" << endl;
-FramePtrVector frames (10); // A list of frames for streaming . We chose
+FramePtrVector frames (15); // A list of frames for streaming . We chose
 // to queue 3 frames .
 
 
@@ -36,7 +36,9 @@ VmbInt64_t nPLS;
 
 
 
-    
+
+
+
 ///////////////////////////FRAME OBSERVER CLASS
 
 FrameObserver::FrameObserver ( CameraPtr pCamera ) : IFrameObserver ( pCamera )
@@ -54,10 +56,10 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
             StartReceiving = true; //Start the display when we start receiving
             
             //For counting the FPS
-            total_time += ((float)clock() - start)/CLOCKS_PER_SEC;
-            start = clock();
+            //total_time += ((float)clock() - start)/CLOCKS_PER_SEC;
+            //start = clock();
             
-            cout << "Frame received successfully !!" << endl;
+            //cout << "Frame received successfully !!" << endl;
             pFrame->GetImage(ptr_raw_frame); //Getting raw image
             
             /*unsigned int width, height;
@@ -66,7 +68,18 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
 
             cout << width << " x " << height << endl;*/
             img_count++;
-            
+            m_FPSReceived.count( img_count );
+            VmbUint64_t camera_frame_id;
+            pFrame->GetFrameID( camera_frame_id );
+            m_FPSCamera.count( camera_frame_id ); 
+    
+            if( m_FPSReceived.isValid() )
+            {
+                if(img_count%5 == 0)// Printing current fps
+                {
+                    Print_FPS();
+                }
+            }
             
             // Put your code here to react on a successfully received frame
         }
@@ -81,14 +94,13 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
 }
 
 
-void FrameObserver::Print_FPS() //static method for FPS print
+void FrameObserver::Print_FPS() //method for FPS print
 {
-    cout << "Average FPS : " << img_count/total_time << " FPS" << endl;
-    img_count = 0;
-    total_time = 0.0f;
+    cout << "Received : " << m_FPSReceived.CurrentFPS() << " FPS" << endl;
+    cout << "Camera : " << m_FPSCamera.CurrentFPS() << " FPS" << endl;
 }
 
-float FrameObserver::total_time = 0.0f, FrameObserver::start = clock(); //For FPS count
+//float FrameObserver::total_time = 0.0f, FrameObserver::start = clock(); //For FPS count
 
 
 
@@ -153,9 +165,9 @@ VmbErrorType Open_and_Start_Acquisition()
     }
     
     ////////Setting up some features
-    VmbInt64_t H, W;
-    bool writable1, writable2;
-    
+    VmbInt64_t H, W, val;
+    //bool writable1, writable2;
+    //For printing readouts
     ///Reducing resolution
     
    /* err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
@@ -177,7 +189,84 @@ VmbErrorType Open_and_Start_Acquisition()
     err = pFeature -> GetValue(W); 
   //  err = pFeature -> IsWritable(writable2);*/
     
-    cout << "Img resolution : " << W << "x" << H << endl;
+   // cout << "Img resolution : " << W << "x" << H << endl;
+    
+    
+    //Fixing exposure time and gain (for higher framerates)
+   
+    /*err = cameras[0]->GetFeatureByName ( "ExposureMode", pFeature );
+    err = pFeature -> SetValue("Timed");
+    if(VmbErrorSuccess != err){
+        cout << "Could not set exposure mode" << endl;
+        return err;
+    }*/
+    
+    /*err = cameras[0]->GetFeatureByName ( "IntensityControllerTarget", pFeature );
+    err = pFeature -> SetValue(40.0f);
+    if(VmbErrorSuccess != err){
+        cout << "Could not set exposure auto" << endl;
+        return err;
+    }*/
+    
+    
+    /**/err = cameras[0]->GetFeatureByName ( "ExposureAuto", pFeature );
+    err = pFeature -> SetValue("Continuous");
+    if(VmbErrorSuccess != err){
+        cout << "Could not set exposure auto" << endl;
+        return err;
+    }
+    
+    /*err = cameras[0]->GetFeatureByName ( "ExposureTime", pFeature );
+    err = pFeature -> SetValue(168.0f);
+    if(VmbErrorSuccess != err){
+        cout << "Could not set exposure time" << endl;
+        return err;
+    } */
+    
+    /*err = cameras[0]->GetFeatureByName ( "LineStatusAll", pFeature );
+    err = pFeature -> GetValue(val);
+    cout << val << endl;
+    if(VmbErrorSuccess != err){
+        cout << "Could not get lines status" << endl;
+        return err;
+    } */
+    
+    
+    
+    /**/err = cameras[0]->GetFeatureByName ( "GainAuto", pFeature );
+    err = pFeature -> SetValue("Continuous");
+    if(VmbErrorSuccess != err){
+        cout << "Could not set auto gain" << endl;
+        return err;
+    } 
+    
+    /*bool available1, available2, available3;
+    err = cameras[0]->GetFeatureByName ( "SensorBitDepth", pFeature );
+    err = pFeature -> IsValueAvailable( "Bpp8", available1 );
+    err = pFeature -> IsValueAvailable( "Bpp10", available2 );
+    err = pFeature -> IsValueAvailable( "Bpp12", available3 );
+    cout << "Sensorbit depth available : "<< available1 << "\t" << available2 << "\t" << available3 << endl;
+    err = pFeature -> IsWritable( available1 );
+    cout << "writable : " << available1 << endl;*/
+    
+        
+    
+    /*err = pFeature -> SetValue("Bpp8");
+    if(VmbErrorSuccess != err){
+        cout << "Could not set SensorBitDepth" << endl;
+        return err;
+    }*/
+    
+    /*string whatever;
+    err = cameras[0]->GetFeatureByName ("ExposureActiveMode", pFeature );
+    err = pFeature -> GetValue(whatever);
+    if(VmbErrorSuccess != err){
+        cout << "Could not get exposure active mode " << endl;
+        return err;
+    }
+    cout << whatever << endl;*/
+    
+    
     
     ////////
     cout << "Starting capture" << endl;
@@ -214,25 +303,34 @@ VmbErrorType Open_and_Start_Acquisition()
 VmbErrorType Stop_Acquisition_and_Close()
 {
 
-    cout << "Stopping program"<< endl;
+    cout << "Stopping program" << endl;
     // When finished , tear down the acquisition chain , close the camera and Vimba
 
     err = cameras[0]->GetFeatureByName ( "AcquisitionStop", pFeature );//Stopping image acquisition
     err = pFeature -> RunCommand ();
-    if(err != VmbErrorSuccess)
-        return err;
+    if(err != VmbErrorSuccess){
+        cout << "Couldnt stop acquisition" << endl;
+        return err;  
+    }
         
     err = cameras[0]-> EndCapture ();
-    if(err != VmbErrorSuccess)
-        return err;
+    if(err != VmbErrorSuccess){
+        cout << "Couldnt end capture" << endl;
+        return err;  
+    }
+
         
     err = cameras[0]-> FlushQueue ();
-    if(err != VmbErrorSuccess)
-        return err;
+    if(err != VmbErrorSuccess) {
+        cout << "Couldnt flush queue" << endl;
+        return err;  
+    }
         
     err = cameras[0]-> RevokeAllFrames ();
-    if(err != VmbErrorSuccess)
-        return err;
+    if(err != VmbErrorSuccess){
+        cout << "Couldnt revoke frames" << endl;
+        return err;  
+    }
         
     
     for( FramePtrVector :: iterator iter= frames .begin (); frames .end ()!= iter; ++ iter)
@@ -242,12 +340,16 @@ VmbErrorType Stop_Acquisition_and_Close()
     }
 
     err = cameras[0]-> Close ();
-    if(err != VmbErrorSuccess)
-        return err;
+    if(err != VmbErrorSuccess){
+        cout << "Couldnt close camera" << endl;
+        return err;  
+    }
         
     err = sys. Shutdown ();
-    if(err != VmbErrorSuccess)
-        return err;
+    if(err != VmbErrorSuccess){
+        cout << "Couldnt shutdown system" << endl;
+        return err;  
+    }
 
     cout << "STOP" << endl;
     
