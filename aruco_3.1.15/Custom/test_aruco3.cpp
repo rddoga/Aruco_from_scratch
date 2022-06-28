@@ -7,7 +7,7 @@
 #define ENABLE_GPU_UPLOAD
 #endif
 
-#define OLD_CAMERA 1 //For knowing if we are using the old or the new camera (COMMENT IF USING NEW CAMERA)
+//#define OLD_CAMERA 1 //For knowing if we are using the old or the new camera (COMMENT IF USING NEW CAMERA)
 
 #ifdef OLD_CAMERA 
 #include "v4l2_helper.h"
@@ -99,6 +99,7 @@ aruco::MarkerDetector MDetector; //Detector object
 aruco::CameraParameters camParameters; //Camera object for saving camera parameters
 aruco::MarkerMapPoseTracker MMTracker; //tracker for estimating the pose of the markermap
 aruco::MarkerMapPoseTracker MMRelativeTracker; //Tracker for the relative merkermap
+
 //aruco::MarkerMap mmap; //main MarkerMap //!\\ DOESNT WORK - THROWS SEGMENTATION FAULT !!
 
 
@@ -110,8 +111,8 @@ aruco::MarkerMapPoseTracker MMRelativeTracker; //Tracker for the relative merker
 
 
 
-//For handling cam Startup/Shutdown errors
-class Cam_Exception : public std::exception
+//For handling cam Startup/Shutdown errors (DOESNT WORK !!)
+/*class Cam_Exception : public std::exception
 {
     const char* cam_err;
 public:
@@ -122,7 +123,7 @@ public:
     {
         return cam_err;
     }
-};
+};*/
 
 
 
@@ -624,8 +625,8 @@ void Detection_Points(cv::Mat imageCopy)
 
 int main(int argc, char** argv)
 {
-    try
-    {
+    //try
+    //{
         aruco::MarkerMap* mmap = new aruco::MarkerMap; //Tool (main) MarkerMap
         aruco::MarkerMap* mmRelative = new aruco::MarkerMap; //Relative MarkerMap
 
@@ -638,13 +639,22 @@ int main(int argc, char** argv)
 
         //Used for streaming video to web server
         //to hand opencv image to hlssink
-        cv::VideoWriter writer;
+        /**/cv::VideoWriter writer;
         
         //Pipeline for sending frames to server
-        /*string pipeline = "appsrc ! videoconvert ! videoscale ! video/x-raw,width=960,height=540 ! x264enc bitrate=256 ! video/x-h264,profile=\"high\" ! mpegtsmux ! hlssink playlist-root=http://10.5.83.185:8080 location=/home/rddoga/Desktop/hlstest/segment_%05d.ts playlist-location=/home/rddoga/Desktop/hlstest/playlist.m3u8 target-duration=5 max-files=5 ";*/
-        string pipeline = "test_video.avi";//cv::VideoWriter::fourcc('P','I','M','1') 
-        writer.open(pipeline, 0, 25, cv::Size(640, 480),true);
+        //string pipeline = "appsrc ! videoconvert ! videoscale ! video/x-raw,width=960,height=540 ! x264enc bitrate=256 ! video/x-h264,profile=\"high\" ! mpegtsmux ! hlssink playlist-root=http://10.5.83.185:8080 location=/home/rddoga/Desktop/hlstest/segment_%05d.ts playlist-location=/home/rddoga/Desktop/hlstest/playlist.m3u8 target-duration=5 max-files=5 ";
+        string out = "appsrc ! videoconvert ! videoscale ! video/x-raw, framerate=24/1 ! avenc_mpeg1video bitrate=1000000 ! mpegtsmux ! curlhttpsink location=http://127.0.0.1:8080/rddoga"; //      "http://localhost:8080/rddoga""./test_video.avi"
+        int codec = cv::VideoWriter::fourcc('P','I','M','1');
+        cv::Size frame_size(1280, 720);
+        double fps = 24.0;
         
+        writer.open(out, cv::CAP_GSTREAMER, 0, fps, frame_size);//cv::CAP_FFMPEG
+        
+        if (!writer.isOpened()) {
+            std::cout << "Could not open output file" << std::endl;
+            exit(1); // or error handling
+        }
+
         //Buffer for sending raw image
         //vector< uchar > buff;
         
@@ -709,18 +719,18 @@ int main(int argc, char** argv)
 
 #ifdef ENABLE_GL_DISPLAY
         std::cout << "Using openGL\n";
-        cv::namedWindow("Tool", cv::WINDOW_OPENGL);
+        //cv::namedWindow("Tool", cv::WINDOW_OPENGL);
         //cv::namedWindow("Thresh", cv::WINDOW_OPENGL);
 #else
         std::cout << "Not using openGL\n";
-        cv::namedWindow("Tool", cv::WINDOW_NORMAL);
+        //cv::namedWindow("Tool", cv::WINDOW_NORMAL);
         //cv::namedWindow("Thresh", cv::WINDOW_NORMAL);
 #endif
 
 //        cv::namedWindow("Tool", cv::WINDOW_GUI_EXPANDED);
         cv::namedWindow("Trackbars", cv::WINDOW_GUI_EXPANDED);
         
-        cv::resizeWindow("Tool", 1920, 1080);
+        //cv::resizeWindow("Tool", 1920, 1080);
         //cv::resizeWindow("Thresh", 1920, 1080);
         //cv::resizeWindow("Trackbars", 100, 100);
         cv::moveWindow("Trackbars",0,900);
@@ -743,7 +753,9 @@ int main(int argc, char** argv)
         //NEW CAMERA
         //Startup and start image acquisition
         if(VmbErrorSuccess != Open_and_Start_Acquisition() ){
-            throw Cam_Exception("Openning / Start Acquisition error !");
+            //throw Cam_Exception("Openning / Start Acquisition error !");
+            cout << "Openning / Start Acquisition error !" << endl;
+            return -1;
         }
 #endif        
         
@@ -845,7 +857,7 @@ int main(int argc, char** argv)
                 Mdetected++;
                 for(size_t i=0;i<markers.size();i++){
                     //draw in the image
-                    markers[i].draw(imageCopy, cv::Scalar(0, 0, 255), 1, false);
+                    markers[i].draw(imageCopy, cv::Scalar(0, 0, 255), 2, false);
                 }
             }
             tm_comp1.stop();
@@ -1119,12 +1131,12 @@ int main(int argc, char** argv)
             
             cpt++;
             
-            cv::Mat imgPrint = cv::Mat(480, 640, CV_8UC3); 
+            cv::Mat imgPrint = cv::Mat(720,1280, CV_8UC3); 
             //resize down for printing the image
             cv::resize(imageCopy, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);
             
 #if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
-            gpu_frame.upload(imgPrint);//resized_down
+            //gpu_frame.upload(imgPrint);//resized_down
             //cv::imshow("Tool", gpu_frame);
 #else
             //cv::imshow("Tool", imgPrint);//resized_down
@@ -1132,8 +1144,8 @@ int main(int argc, char** argv)
 
             //cv::resize(imgPrint, imgPrint, cv::Size(480, 640), 0, 0, cv::INTER_NEAREST);
             
-            //hand image to websocket by ffmpeg 
-            writer << imgPrint;
+            //hand image to websocket by Gstreamer 
+            writer.write(imgPrint);
             
             /*std::vector<uchar> buff;
             cv::imencode(".jpg", imgPrint, buff);
@@ -1154,7 +1166,7 @@ int main(int argc, char** argv)
             
             tm_full.stop();
         }
-        
+
 #ifdef OLD_CAMERA             
         // exiting program
         if (helper_deinit_cam() < 0)
@@ -1163,14 +1175,24 @@ int main(int argc, char** argv)
         //exiting = true; //Indicate that we have to stop the image getter thread
         //t1.join(); //Wait for the other thread to finish
         
+        //Clearing all windows
+        cv::destroyAllWindows();
+        
+        //Closing Video Writer
+        //writer.release();
+
+        
         delete mmap; //delete the mmap pointer 
         delete mmRelative; //delete the mmRelative pointer 
 
 #ifndef OLD_CAMERA             
         //NEW CAMERA
         //Stop image acquisition and shutdown camera and API
-        if(VmbErrorSuccess != Stop_Acquisition_and_Close() )
-            throw Cam_Exception("Closing / Stop Acquisition error !");/**/
+        if(VmbErrorSuccess != Stop_Acquisition_and_Close() ){
+            //throw Cam_Exception("Closing / Stop Acquisition error !");/**/
+            cout << "Closing / Stop Acquisition error !" << endl;
+            return -1;
+        }
 #endif            
        // cout << "Average image catch time : " << timerImg.getAvrg() * 1000 << " ms" << endl;
         //cout << "Average image catch time (timer 2): " << (float)sum/cpt << " ms" << endl;
@@ -1182,35 +1204,30 @@ int main(int argc, char** argv)
         //std::cout << "Average image catch time (timer 2): " << (sum_img/cpt) * 1000 << " ms  /!\\ keep in mind this is done in a separate thread" << std::endl;
         //cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
         
-        
+
 #ifdef OLD_CAMERA                    
         cout << "Average image catch time (old camera): " << tm_image.getAvgTimeSec() * 1000 << " ms" << std::endl;
+#endif         
         cout << "Average image copy time (old camera): " << tm_copy.getAvgTimeSec() * 1000 << " ms" << std::endl;
         cout << "Average detection time (old camera): " << tm_detect.getAvgTimeSec() * 1000 << " ms" << std::endl;
         cout << "Average comp 1 time (old camera): " << tm_comp1.getAvgTimeSec() * 1000 << " ms" << std::endl;
         cout << "Average comp 2 time (old camera): " << tm_comp2.getAvgTimeSec() * 1000 << " ms" << std::endl;
         cout << "Average comp 3 time (old camera): " << tm_comp3.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        std::cout << "Average full computation time (old camera): " << tm_full.getAvgTimeSec() * 1000 << " ms" << std::endl;
-#else
-        cout << "Average image copy time (new camera): " << tm_copy.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average detection time (new camera): " << tm_detect.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average comp 1 time (new camera): " << tm_comp1.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average comp 2 time (new camera): " << tm_comp2.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average comp 3 time (new camera): " << tm_comp3.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        std::cout << "Average full computation time (new camera): " << tm_full.getAvgTimeSec() * 1000 << " ms" << std::endl;
-#endif               
-        
+        cout << "Average full computation time (old camera): " << tm_full.getAvgTimeSec() * 1000 << " ms" << std::endl;  
         
         //std::cout << "Average full time (timer 2): " << ((sum_comp+sum_img)/cpt) * 1000 << " ms" << std::endl;
         cout << "Real average FPS  : "<< tm_full.getFPS() << " fps" << endl << endl;
         
         cout << "MArker catch frequency : " << (float)Mdetected*100/cpt << " % of the time." << endl;
-    }
+        
+        //USING EXIT BECAUSE RETURN 0 DOESNT STOP PROGRAMME ....
+        //exit(1);
+    /*}
     catch(std::exception& ex)
     {
         cout << "Exception : " << ex.what() << "\n";
-    }
+    }*/
+       
     return 0;
-    //printf("hello\n");
     
 }
