@@ -1,21 +1,30 @@
 //Comment if needed
-/*#ifndef ENABLE_GL_DISPLAY
+#ifndef ENABLE_GL_DISPLAY
 #define ENABLE_GL_DISPLAY
 #endif
 
 #ifndef ENABLE_GPU_UPLOAD
 #define ENABLE_GPU_UPLOAD
-#endif*/
+#endif
 
-//#include "v4l2_helper.h"
-//#include "utils.h"
-//#include "i2c_helper.h"
+#define OLD_CAMERA 1 //For knowing if we are using the old or the new camera (COMMENT IF USING NEW CAMERA)
+
+#ifdef OLD_CAMERA 
+#include "v4l2_helper.h"
+
+#else
 #include "Alvium_Camera.h"
+
+#endif
+
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/video.hpp>
+#include <opencv2/videoio.hpp>
 #include <opencv2/core/cuda.hpp>
+
 #include "aruco.h"
 #include "markermap.h"
 
@@ -41,7 +50,12 @@ using namespace std;
 //bool StartReceiving = false;
 
 
+#ifdef OLD_CAMERA
 int imgSizeX = 1920, imgSizeY = 1080;
+#else
+int imgSizeX = 2008, imgSizeY = 1518;
+#endif
+
 float zOffset = 350; //position of the tool cursor on the z axis (in the tool markermap basis). Value will be changed by trackbar
 
 bool exiting = false; //For the image getter to know when to stop getting the image
@@ -621,22 +635,31 @@ int main(int argc, char** argv)
         int bytes_used, key = -1, lastkey = -1;
         //TimerAvrg timerFull, timerGetImage, timerComputation;
         //string posMarkerMapfile = "stacked.yml";
-    
-        clock_t start, stop;
-        //float sum_img = 0.0f;
 
-        //Image that gets data from the frame pointer
+        //Used for streaming video to web server
+        //to hand opencv image to hlssink
+        cv::VideoWriter writer;
         
-        //NEW CAMERA
-        cv::Mat raw_frame = cv::Mat(3036, 4024, CV_8UC1);
-       
+        //Pipeline for sending frames to server
+        /*string pipeline = "appsrc ! videoconvert ! videoscale ! video/x-raw,width=960,height=540 ! x264enc bitrate=256 ! video/x-h264,profile=\"high\" ! mpegtsmux ! hlssink playlist-root=http://10.5.83.185:8080 location=/home/rddoga/Desktop/hlstest/segment_%05d.ts playlist-location=/home/rddoga/Desktop/hlstest/playlist.m3u8 target-duration=5 max-files=5 ";*/
+        string pipeline = "test_video.avi";//cv::VideoWriter::fourcc('P','I','M','1') 
+        writer.open(pipeline, 0, 25, cv::Size(640, 480),true);
+        
+        //Buffer for sending raw image
+        //vector< uchar > buff;
+        
+        //Image that gets data from the frame pointer
+#ifdef OLD_CAMERA
         //OLD CAMERA
-        /*cv::Mat yuyv_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC2);
+        cv::Mat yuyv_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC2);
         //Original image, that gets the cam frame from the pointer
         cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
         //copied image, for printing the markers on the screen
-        cv::Mat imageCopy;*/
-        
+        cv::Mat imageCopy;
+#else
+        //NEW CAMERA
+        cv::Mat raw_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC1);   
+#endif        
         
         //empty img used for displaying the trackbar
         cv::Mat TrackbarImg = cv::Mat::zeros(1, 500, CV_8UC1);
@@ -644,7 +667,7 @@ int main(int argc, char** argv)
 
         //Set dictionary and detection mode
         //MDetector.setDictionary("ARUCO_MIP_16h3");
-        MDetector.setDetectionMode(aruco::DM_NORMAL);
+        MDetector.setDetectionMode(aruco::DM_FAST);
         
         //Changing manually the parameters of the detector
         aruco::MarkerDetector::Params &params= MDetector.getParameters();
@@ -665,15 +688,15 @@ int main(int argc, char** argv)
         //Load configuration
         ParseConfig(argv[1], mmap, mmRelative);
         
-        
+#ifdef OLD_CAMERA        
         //OLD CAMERA
-        /*//Initialise camera
+        //Initialise camera
         if(helper_init_cam("/dev/video0", imgSizeX, imgSizeY, V4L2_PIX_FMT_UYVY, IO_METHOD_USERPTR) < 0) // or V4L2_PIX_FMT_YUYV
         {
             cout << "Failed to open video" << endl;
             return -1;
-        }*/
-        
+        }
+#endif        
         
 
 //Use opengl and cuda for speedup
@@ -687,15 +710,18 @@ int main(int argc, char** argv)
 #ifdef ENABLE_GL_DISPLAY
         std::cout << "Using openGL\n";
         cv::namedWindow("Tool", cv::WINDOW_OPENGL);
+        //cv::namedWindow("Thresh", cv::WINDOW_OPENGL);
 #else
         std::cout << "Not using openGL\n";
         cv::namedWindow("Tool", cv::WINDOW_NORMAL);
+        //cv::namedWindow("Thresh", cv::WINDOW_NORMAL);
 #endif
 
 //        cv::namedWindow("Tool", cv::WINDOW_GUI_EXPANDED);
         cv::namedWindow("Trackbars", cv::WINDOW_GUI_EXPANDED);
         
         cv::resizeWindow("Tool", 1920, 1080);
+        //cv::resizeWindow("Thresh", 1920, 1080);
         //cv::resizeWindow("Trackbars", 100, 100);
         cv::moveWindow("Trackbars",0,900);
         //Creating trackbars
@@ -712,18 +738,21 @@ int main(int argc, char** argv)
         // multithreaded image getter
         //std::thread t1(FrameGetter, std::ref(originalImage));
         //std::this_thread::sleep_for(std::chrono::milliseconds(200));
-           
+        
+#ifndef OLD_CAMERA            
         //NEW CAMERA
         //Startup and start image acquisition
         if(VmbErrorSuccess != Open_and_Start_Acquisition() ){
             throw Cam_Exception("Openning / Start Acquisition error !");
-        }/**/
+        }
+#endif        
         
+        cv::TickMeter tm_full, tm_image, tm_copy, tm_detect, tm_comp1, tm_comp2, tm_comp3;
                     
         ///////////////MAIN WHILE LOOP///////////////////
         while (key != 27){
             
-            
+            tm_full.start();
             // timerFull.start();
             
             //start = clock();
@@ -731,8 +760,12 @@ int main(int argc, char** argv)
             //timerGetImage.start();
             //////////////IF NOT MULTITHREADED////////////////////////
             
+            key = cv::waitKey(1) & 0xFF; //Registering pressed key
+            
+#ifdef OLD_CAMERA       
+            tm_image.start();      
             // OLD CAMERA
-            /*//getting cam frame
+            //getting cam frame
             if (helper_get_cam_frame(&ptr_cam_frame, &bytes_used) < 0)
             {
                 fprintf(stderr, "Failed to get image : %m\n");
@@ -748,54 +781,52 @@ int main(int argc, char** argv)
             {
                 fprintf(stderr, "Failed to release image : %m\n");
                 break;
-            }*/
-            
-            key = cv::waitKey(1) & 0xFF; //Registering pressed key
-            
+            }    
+            tm_image.stop();                  
+#else           
             //NEW CAMERA
             if(!StartReceiving){//Check if we started receiving
                 continue;
             }
              
-            raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?)/**/
+            raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?)           
+#endif            
             
-            
-            /*OLD CAMERA
-            stop = clock();
-            //timerGetImage.stop();
-            //cout << ((float) stop - start)/CLOCKS_PER_SEC << endl;
-            sum_img += (((float) stop - start)/CLOCKS_PER_SEC);*/
-            
-            
-            //timerImg.stop();
-            //timerComputation.start();
-            
-            
-            start = clock();
-            
+
+
+#ifdef OLD_CAMERA                 
             //OLD CAMERA   
+            tm_copy.start();
             //Copying image for showing the detected markers
-            //originalImage.copyTo(imageCopy);
-            
+            originalImage.copyTo(imageCopy);
+            tm_copy.stop();
+#else            
             //NEW CAMERA
-            //Copy and resize image to the right format
-            cv::Mat imgtmp = cv::Mat(imgSizeY, imgSizeX, CV_8UC1), imageCopy = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
+            tm_copy.start();
+            //Copy image to the right format
 
-            //resize down for printing the image
-            cv::resize(raw_frame, imgtmp, imgtmp.size(), 0, 0, cv::INTER_NEAREST);
+            cv::Mat imageCopy = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
+            
+            cv::cvtColor(raw_frame, imageCopy, cv::COLOR_GRAY2BGR ); // for printing colored features on the image, and for better marker detection (because needs color image for input)
+            tm_copy.stop();
+#endif
 
-            cv::cvtColor(imgtmp, imageCopy, cv::COLOR_GRAY2BGR ); // for printing colored features on the image
-
+            tm_detect.start();
             //detecting markers
             vector<aruco::Marker> markers=MDetector.detect(imageCopy,camParameters,0.04);
+            //get thresholded image
+            cv::Mat Bin = MDetector.getThresholdedImage();
             //vector<aruco::Marker> markers=MDetector.detect(imageCopy);
+            tm_detect.stop();
             
+            tm_comp1.start();
             //Check if we can find the tool markermap
             if(MMTracker.estimatePose(markers)){
                 OneMarkerValid = true;
             }else{
                 OneMarkerValid = false;
             }
+            
             
             //Check if we can find the relative markermap
             if(!IsStatic){
@@ -817,14 +848,14 @@ int main(int argc, char** argv)
                     markers[i].draw(imageCopy, cv::Scalar(0, 0, 255), 1, false);
                 }
             }
-            
+            tm_comp1.stop();
             /*for(auto m:markers){
                 //aruco::CvDrawingUtils::draw3dAxis(imageCopy, camParameters, m.Rvec, m.Tvec, 0.1);
                 //aruco::CvDrawingUtils::draw3dCube(imageCopy, m, camParameters, 1);
                 //cout<<m.Rvec<<" "<<m.Tvec<<endl;
             }*/
             
-            
+            tm_comp2.start();
             //For Preventing registration of many points at once if a key is pressed too long
             if(lastkey == key && key != -1){
                 lastkey = key;
@@ -936,6 +967,10 @@ int main(int argc, char** argv)
                 }
             }
             
+            tm_comp2.stop();
+            
+            
+            tm_comp3.start();
             /////////////////IF THE ORIGIN IS NOT SET (and we want static positionning), SET IT ////////////////////////
             if(!IsStaticSet && IsStatic)
             {
@@ -1084,44 +1119,59 @@ int main(int argc, char** argv)
             
             cpt++;
             
-            //NEW CAMERA
-            /*if(FrameObserver::total_time > 1.0f)
-            {
-                FrameObserver::Print_FPS();
-            }*/
+            cv::Mat imgPrint = cv::Mat(480, 640, CV_8UC3); 
+            //resize down for printing the image
+            cv::resize(imageCopy, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);
             
 #if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
-            gpu_frame.upload(imageCopy);//resized_down
-            cv::imshow("Tool", gpu_frame);
+            gpu_frame.upload(imgPrint);//resized_down
+            //cv::imshow("Tool", gpu_frame);
 #else
-            cv::imshow("Tool", imageCopy);//resized_down
+            //cv::imshow("Tool", imgPrint);//resized_down
 #endif   
 
-            stop = clock();
-            float inter = ((float) stop - start)/CLOCKS_PER_SEC;
-            //cout << "main : " << inter << endl;
-            sum_comp += inter;
+            //cv::resize(imgPrint, imgPrint, cv::Size(480, 640), 0, 0, cv::INTER_NEAREST);
             
-            //timerComputation.stop();
-            //timerFull.stop();
+            //hand image to websocket by ffmpeg 
+            writer << imgPrint;
+            
+            /*std::vector<uchar> buff;
+            cv::imencode(".jpg", imgPrint, buff);
+
+            // Send each image out to ffmpeg, in order to stream the video
+            
+            for (auto i = buff.begin(); i < buff.end(); i++){
+                std::cout << *i;
+            }*/
+            
+            //string out(imgPrint.data, imgPrint.total() * imgPrint.elemSize());//
+            //cout << out; 
+           // cout << imgPrint.data << endl << endl << endl;
+            
+            //cv::imshow("Thresh", Bin);
+            
+            tm_comp3.stop();
+            
+            tm_full.stop();
         }
         
-        
-        /*// exiting program
+#ifdef OLD_CAMERA             
+        // exiting program
         if (helper_deinit_cam() < 0)
-            fprintf(stderr, "Failed to deinitialise camera : %m\n");*/
-        
+            fprintf(stderr, "Failed to deinitialise camera : %m\n");
+#endif       
         //exiting = true; //Indicate that we have to stop the image getter thread
         //t1.join(); //Wait for the other thread to finish
         
         delete mmap; //delete the mmap pointer 
         delete mmRelative; //delete the mmRelative pointer 
-        
+
+#ifndef OLD_CAMERA             
         //NEW CAMERA
         //Stop image acquisition and shutdown camera and API
         if(VmbErrorSuccess != Stop_Acquisition_and_Close() )
             throw Cam_Exception("Closing / Stop Acquisition error !");/**/
-            
+#endif            
        // cout << "Average image catch time : " << timerImg.getAvrg() * 1000 << " ms" << endl;
         //cout << "Average image catch time (timer 2): " << (float)sum/cpt << " ms" << endl;
         //std::cout << "Average image catch time : "<< timerGetImage.getAvrg() * 1000 << " ms " << endl;
@@ -1131,10 +1181,28 @@ int main(int argc, char** argv)
         
         //std::cout << "Average image catch time (timer 2): " << (sum_img/cpt) * 1000 << " ms  /!\\ keep in mind this is done in a separate thread" << std::endl;
         //cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
-        std::cout << "Average computation time (timer 2): " << ((sum_comp)/cpt) * 1000 << " ms" << std::endl;
         
-        std::cout << "Average full time (timer 2): " << ((sum_comp+sum_img)/cpt) * 1000 << " ms" << std::endl;
-        cout << "Real average FPS (timer 2) : "<< cpt/(sum_comp+sum_img) << " fps" << endl << endl;
+        
+#ifdef OLD_CAMERA                    
+        cout << "Average image catch time (old camera): " << tm_image.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average image copy time (old camera): " << tm_copy.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average detection time (old camera): " << tm_detect.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 1 time (old camera): " << tm_comp1.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 2 time (old camera): " << tm_comp2.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 3 time (old camera): " << tm_comp3.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        std::cout << "Average full computation time (old camera): " << tm_full.getAvgTimeSec() * 1000 << " ms" << std::endl;
+#else
+        cout << "Average image copy time (new camera): " << tm_copy.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average detection time (new camera): " << tm_detect.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 1 time (new camera): " << tm_comp1.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 2 time (new camera): " << tm_comp2.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 3 time (new camera): " << tm_comp3.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        std::cout << "Average full computation time (new camera): " << tm_full.getAvgTimeSec() * 1000 << " ms" << std::endl;
+#endif               
+        
+        
+        //std::cout << "Average full time (timer 2): " << ((sum_comp+sum_img)/cpt) * 1000 << " ms" << std::endl;
+        cout << "Real average FPS  : "<< tm_full.getFPS() << " fps" << endl << endl;
         
         cout << "MArker catch frequency : " << (float)Mdetected*100/cpt << " % of the time." << endl;
     }
