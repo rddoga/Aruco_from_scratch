@@ -24,7 +24,7 @@ CameraPtrVector cameras ;
 // A list of known cameras
 
 //cout << "creating frame vector" << endl;
-FramePtrVector frames (15); // A list of frames for streaming . We chose
+FramePtrVector frames (10); // A list of frames for streaming . We chose
 // to queue 3 frames .
 
 
@@ -62,11 +62,12 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
             //cout << "Frame received successfully !!" << endl;
             pFrame->GetImage(ptr_raw_frame); //Getting raw image
             
-            /*unsigned int width, height;
+            unsigned int width, height;
             pFrame->GetHeight(height);
             pFrame->GetWidth(width);
 
-            cout << width << " x " << height << endl;*/
+            cout << width << " x " << height << endl;/**/
+            
             img_count++;
             m_FPSReceived.count( img_count );
             VmbUint64_t camera_frame_id;
@@ -166,20 +167,14 @@ VmbErrorType Open_and_Start_Acquisition()
     
     ////////Setting up some features
     VmbInt64_t H, W, val;
-    //bool writable1, writable2;
+    bool writable1, writable2;
     //For printing readouts
     ///Reducing resolution
     
-   /* err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
-    err = pFeature -> SetValue("Sum");
-    err = pFeature -> IsWritable(writable1);
-    
-    err = cameras[0]->GetFeatureByName ( "BinningVertical", pFeature );
-    err = pFeature -> SetValue(2); //dividing by 2 the original vertical resolution (the horizontal one is then divided automatically)
-    err = pFeature -> IsWritable(writable2);
+
     
     
-    err = cameras[0]->GetFeatureByName ( "Height", pFeature );
+    /*err = cameras[0]->GetFeatureByName ( "Height", pFeature );
     err = pFeature -> SetValue(1080); //set the wanted height (/!\ NE RESIZE PAS L IMAGE, PREND JUSTE LE NOMBRE DE PIXELS VOULUS)
     err = pFeature -> GetValue(H);
    // err = pFeature -> IsWritable(writable1);
@@ -208,13 +203,19 @@ VmbErrorType Open_and_Start_Acquisition()
         return err;
     }*/
     
+    /*err = cameras[0]->GetFeatureByName ( "GainAuto", pFeature );
+    err = pFeature -> SetValue("Continuous");
+    if(VmbErrorSuccess != err){
+        cout << "Could not set auto gain" << endl;
+        return err;
+    } */
     
-    /**/err = cameras[0]->GetFeatureByName ( "ExposureAuto", pFeature );
+    /*err = cameras[0]->GetFeatureByName ( "ExposureAuto", pFeature );
     err = pFeature -> SetValue("Continuous");
     if(VmbErrorSuccess != err){
         cout << "Could not set exposure auto" << endl;
         return err;
-    }
+    }*/
     
     /*err = cameras[0]->GetFeatureByName ( "ExposureTime", pFeature );
     err = pFeature -> SetValue(168.0f);
@@ -231,14 +232,24 @@ VmbErrorType Open_and_Start_Acquisition()
         return err;
     } */
     
-    
-    
-    /**/err = cameras[0]->GetFeatureByName ( "GainAuto", pFeature );
-    err = pFeature -> SetValue("Continuous");
+   /* err = cameras[0]->GetFeatureByName ( "ContrastEnable", pFeature );
+    //err = pFeature -> IsWritable(writable1);
+    //cout << writable1 << endl;
+    err = pFeature -> SetValue(true);
     if(VmbErrorSuccess != err){
-        cout << "Could not set auto gain" << endl;
+        cout << "Could not set contrast" << endl;
         return err;
-    } 
+    }
+    
+    err = cameras[0]->GetFeatureByName ( "Sharpness", pFeature );
+    //err = pFeature -> IsWritable(writable1);
+    //cout << writable1 << endl;
+    err = pFeature -> SetValue(8);
+    if(VmbErrorSuccess != err){
+        cout << "Could not set sharpness" << endl;
+        return err;
+    }*/
+    
     
     /*bool available1, available2, available3;
     err = cameras[0]->GetFeatureByName ( "SensorBitDepth", pFeature );
@@ -265,10 +276,48 @@ VmbErrorType Open_and_Start_Acquisition()
         return err;
     }
     cout << whatever << endl;*/
+    err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
+    err = pFeature -> SetValue("Average"); //Summing values when binning adjacent pixels
+    err = pFeature -> IsWritable(writable1);
+    
+    err = cameras[0]->GetFeatureByName ( "BinningVertical", pFeature );
+    err = pFeature -> SetValue(2); //dividing by 2 the original vertical resolution (the horizontal one is then divided automatically)
+    err = pFeature -> IsWritable(writable2);/**/
+    
+    double framerate, min, max;
+    err = cameras[0]->GetFeatureByName ( "Gain", pFeature );
+    err = pFeature -> SetValue(23.0f);
+    err = pFeature -> GetRange( min, max );
+    cout << "(min : " << min << " / max : " << max << " )" << endl;
+    if(VmbErrorSuccess != err){
+        cout << "Could not set exposure time" << endl;
+        return err;
+    }
+    
+    err = cameras[0]->GetFeatureByName ( "ExposureTime", pFeature );
+    err = pFeature -> SetValue(9000.0f);
+    if(VmbErrorSuccess != err){
+        cout << "Could not set exposure time" << endl;
+        return err;
+    }/**/
     
     
     
-    ////////
+    /*err = cameras[0]->GetFeatureByName ( "Height", pFeature );
+    err = pFeature -> SetValue(1080); //set the wanted height
+    err = pFeature -> GetValue(H);
+   // err = pFeature -> IsWritable(writable1);
+    
+    err = cameras[0]->GetFeatureByName ( "Width", pFeature );
+    err = pFeature -> SetValue(1920); //set the wanted width
+    err = pFeature -> GetValue(W); 
+    cout << "Img resolution : " << W << "x" << H << endl;*/
+    
+    
+       
+    
+    ///////////////////////
+    ///////////////////////
     cout << "Starting capture" << endl;
     err = cameras [0]-> StartCapture ();
     if(err != VmbErrorSuccess)
