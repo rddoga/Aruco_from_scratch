@@ -14,9 +14,9 @@ include(cmake/options.cmake)
 include(cmake/findDependencies.cmake)
 include(cmake/compilerOptions.cmake)
 
-
-add_subdirectory(src)
-add_subdirectory(Custom)
+add_subdirectory(Crow) #FOR including Crow Webserver
+add_subdirectory(src) #For including aruco source files
+add_subdirectory(Custom) # For including Custom test files
 
 # if(GL_FOUND AND BUILD_GLSAMPLES)
 #  add_subdirectory(utils_gl)

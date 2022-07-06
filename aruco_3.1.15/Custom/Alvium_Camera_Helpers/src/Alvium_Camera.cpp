@@ -1,4 +1,5 @@
 #include "Alvium_Camera.h"
+#include <QTime>
 
 using namespace std;
 using namespace AVT::VmbAPI;
@@ -36,6 +37,41 @@ VmbInt64_t nPLS;
 
 
 
+/////////////Function for the fps counting class
+
+//Constructor
+FPSCounter::FPSCounter() : m_IsRunning( false ), m_LastFrameID( 0 ) , m_Valid( false )
+    {
+        m_Timer = new QTime;
+    }
+    
+
+void FPSCounter::count( VmbInt64_t id )
+    {
+        if( ! m_IsRunning )
+        {
+            m_LastFrameID   = id;
+            m_IsRunning     = true;
+            m_Valid         = false;
+            m_Timer->start();
+            return;
+        }
+        double      time_ms     = m_Timer->elapsed();
+        VmbInt64_t  delta_id = id - m_LastFrameID;
+        if( (time_ms > 1000  && delta_id != 0) )
+        {
+            m_CurrentFPS    = (delta_id*1000) / time_ms;
+            m_LastFrameID   = id;
+            m_Valid         = true;
+            m_Timer->start();
+        }
+    }
+  
+  //Destuctor (needed for the QTime pointer)
+FPSCounter::~FPSCounter()
+    {
+        delete m_Timer;
+    }
 
 
 
@@ -66,7 +102,7 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
             pFrame->GetHeight(height);
             pFrame->GetWidth(width);
 
-            cout << width << " x " << height << endl;/**/
+           // cout << width << " x " << height << endl;/**/
             
             img_count++;
             m_FPSReceived.count( img_count );
@@ -76,11 +112,11 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
     
             if( m_FPSReceived.isValid() )
             {
-                if(img_count%5 == 0)// Printing current fps
+                if(img_count%10 == 0)// Printing current fps
                 {
                     Print_FPS();
                 }
-            }
+            }/**/
             
             // Put your code here to react on a successfully received frame
         }

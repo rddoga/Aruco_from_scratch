@@ -8,7 +8,7 @@
 #include <string>
 #include <cstring>
 #include <unistd.h>
-#include <QTime>
+//
 
 
 //////////////////////////GLOBAL VARIABLES (Needed by .cpp file)
@@ -23,86 +23,23 @@ extern int img_count;          //For FPS count
 /////////////////////////////////
 ///CLASSES FOR FPS COUNTING
 
-#ifdef _WIN32
-/*high resolution timer for windows*/
-class PrecisionTimer
-{
-    const LARGE_INTEGER     m_Frequency;
-    LARGE_INTEGER           m_Time;
-    static LARGE_INTEGER getFrq()
-    {
-        LARGE_INTEGER tmp;
-        QueryPerformanceFrequency( & tmp );
-        return tmp;
-    }
-public:
-    PrecisionTimer()
-        : m_Frequency( getFrq() )
-    {
-    }
-    LARGE_INTEGER Frequency() const { return m_Frequency; }
-    LARGE_INTEGER Ticks() const
-    {
-        LARGE_INTEGER tmp;
-        QueryPerformanceCounter( &tmp );
-        return tmp;
-    }
-    void start()
-    {
-        QueryPerformanceCounter( &m_Time );
-    }
-    double elapsed() const
-    {
-        LARGE_INTEGER tmpTime;
-        QueryPerformanceCounter( &tmpTime );
-        tmpTime.QuadPart -= m_Time.QuadPart;
-        return (tmpTime.QuadPart*1000.0)/ m_Frequency.QuadPart;
-    }
-};
-
-typedef PrecisionTimer timer_type;
-#else
-typedef QTime timer_type;
-#endif
+class QTime;
 
 /*class to calculate frames per second*/
 class FPSCounter
 {
     double          m_CurrentFPS;
-    timer_type      m_Timer;
+    QTime*          m_Timer;
     bool            m_IsRunning;
     VmbInt64_t      m_LastFrameID;
     bool            m_Valid;
 public:
     double  CurrentFPS()    const { return m_CurrentFPS; }
 
-    FPSCounter( )
-        : m_IsRunning( false )
-        , m_LastFrameID( 0 )
-        , m_Valid( false )
-    {
-
-    }
-    void count( VmbInt64_t id )
-    {
-        if( ! m_IsRunning )
-        {
-            m_LastFrameID   = id;
-            m_IsRunning     = true;
-            m_Valid         = false;
-            m_Timer.start();
-            return;
-        }
-        double      time_ms     = m_Timer.elapsed();
-        VmbInt64_t  delta_id = id - m_LastFrameID;
-        if( (time_ms > 1000  && delta_id != 0) )
-        {
-            m_CurrentFPS    = (delta_id*1000) / time_ms;
-            m_LastFrameID   = id;
-            m_Valid         = true;
-            m_Timer.start();
-        }
-    }
+    FPSCounter( );
+        
+    void count( VmbInt64_t id );
+    
     bool isValid() const {return m_Valid;}
     void stop()
     {
@@ -113,7 +50,7 @@ public:
     }
     bool isRunning() const { return m_IsRunning; }
 
-
+    ~FPSCounter( );
 };
 
 
