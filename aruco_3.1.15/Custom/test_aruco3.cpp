@@ -9,7 +9,7 @@
 
 //#define OLD_CAMERA 1 //For knowing if we are using the old or the new camera (COMMENT IF USING NEW CAMERA)
 
-#ifdef OLD_CAMERA 
+#ifdef OLD_CAMERA
 #include "v4l2_helper.h"
 
 #else
@@ -27,6 +27,8 @@
 
 #include "aruco.h"
 #include "markermap.h"
+
+#include "crow.h"
 
 #include <vector>
 #include <tuple>
@@ -58,7 +60,7 @@ int imgSizeX = 2008, imgSizeY = 1518;
 
 float zOffset = 350; //position of the tool cursor on the z axis (in the tool markermap basis). Value will be changed by trackbar
 
-bool exiting = false; //For the image getter to know when to stop getting the image
+bool exiting = false; //For the image getter/webserver to know when to stop 
 bool OneMarkerValid = false; //Check if the tool markermap is found
 bool OneRelativeMarkerValid = false; //Check if the relative MarkerMap is found
 
@@ -568,6 +570,37 @@ void Detection_Points(cv::Mat imageCopy)
 }
 
 
+//Launch Crow WebServer asynchronously
+void Launch_Crow_WebServer(){
+
+    crow::SimpleApp app; //define your crow application
+    
+    //app.loglevel(crow::LogLevel::Debug); //Afficher différents niveaux de log
+    std::cout << std::system("pwd") << std::endl;//Check the directory of the executable (from linux command "pwd")
+    
+    //define your endpoint at the root directory
+    CROW_ROUTE(app, "/").methods(crow::HTTPMethod::POST)([](){ // 
+    
+        //Setting new template directory
+        //crow::mustache::set_base("/home/rddoga/Desktop/WebSocket_test/jsmpeg");
+        
+        auto page = crow::mustache::load_text("view-stream.html"); // fancypage.html
+
+       // crow::mustache::context ctx ({{"person", name}}); // 
+
+        return page; //
+    });
+    
+    //set the port, set the app to run asynchronously
+    app.port(18080).run_async();
+    
+    //Wait for the bool "exiting" to be set to true by the main thread, then we can stop the app and join the threads
+    while(!exiting);
+    app.stop();
+
+}
+
+
 
 /*void FrameGetter(cv::Mat &originalImage)
 {
@@ -638,16 +671,20 @@ int main(int argc, char** argv)
         //string posMarkerMapfile = "stacked.yml";
 
         //Used for streaming video to web server
-        //to hand opencv image to hlssink
-        /**/cv::VideoWriter writer;
+        //to hand opencv image by GStreamer
+        cv::VideoWriter writer;
         
         //Pipeline for sending frames to server
         //string pipeline = "appsrc ! videoconvert ! videoscale ! video/x-raw,width=960,height=540 ! x264enc bitrate=256 ! video/x-h264,profile=\"high\" ! mpegtsmux ! hlssink playlist-root=http://10.5.83.185:8080 location=/home/rddoga/Desktop/hlstest/segment_%05d.ts playlist-location=/home/rddoga/Desktop/hlstest/playlist.m3u8 target-duration=5 max-files=5 ";
-        string out = "appsrc ! videoconvert ! videoscale ! video/x-raw, framerate=24/1 ! avenc_mpeg1video bitrate=1000000 ! mpegtsmux ! curlhttpsink location=http://127.0.0.1:8080/rddoga"; //      "http://localhost:8080/rddoga""./test_video.avi"
+
+        //GStreamer pipeline for sending and encoding images to server
+        string out = "appsrc ! videoconvert ! videoscale ! video/x-raw, framerate=24/1 ! avenc_mpeg1video bitrate=1500000 ! mpegtsmux ! curlhttpsink location=http://127.0.0.1:8080/rddoga"; //      "http://localhost:8080/rddoga""./test_video.avi"
+        
         int codec = cv::VideoWriter::fourcc('P','I','M','1');
-        cv::Size frame_size(1280, 720);
+        cv::Size frame_size(640, 480);
         double fps = 24.0;
         
+        //open the writer
         writer.open(out, cv::CAP_GSTREAMER, 0, fps, frame_size);//cv::CAP_FFMPEG
         
         if (!writer.isOpened()) {
@@ -746,8 +783,12 @@ int main(int argc, char** argv)
             Calib_points = true;
             
         // multithreaded image getter
-        //std::thread t1(FrameGetter, std::ref(originalImage));
+        ///std::thread t1(FrameGetter, std::ref(originalImage));
         //std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        
+        //Launching web server in another thread
+        std::thread t1(Launch_Crow_WebServer);
+        
         
 #ifndef OLD_CAMERA            
         //NEW CAMERA
@@ -758,6 +799,10 @@ int main(int argc, char** argv)
             return -1;
         }
 #endif        
+
+        
+        //Launch_Crow_WebServer(); //Launch Webserver asynchronously
+        
         
         cv::TickMeter tm_full, tm_image, tm_copy, tm_detect, tm_comp1, tm_comp2, tm_comp3;
                     
@@ -1131,7 +1176,7 @@ int main(int argc, char** argv)
             
             cpt++;
             
-            cv::Mat imgPrint = cv::Mat(720,1280, CV_8UC3); 
+            cv::Mat imgPrint = cv::Mat(480,640, CV_8UC3); 
             //resize down for printing the image
             cv::resize(imageCopy, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);
             
@@ -1171,9 +1216,10 @@ int main(int argc, char** argv)
         // exiting program
         if (helper_deinit_cam() < 0)
             fprintf(stderr, "Failed to deinitialise camera : %m\n");
-#endif       
-        //exiting = true; //Indicate that we have to stop the image getter thread
-        //t1.join(); //Wait for the other thread to finish
+#endif      
+
+        exiting = true; //Indicate that we have to stop the image getter thread
+        t1.join(); //Wait for the other thread to finish
         
         //Clearing all windows
         cv::destroyAllWindows();
