@@ -6,8 +6,8 @@ using namespace AVT::VmbAPI;
 
 
 //////////////////Global variables
-bool StartReceiving = false;
-unsigned char* ptr_raw_frame;
+//bool StartReceiving = false;
+unsigned char* ptr_raw_frame = NULL; //Pointer that will be catching the frame
 int img_count = 0;          //For FPS count
 
 //cout << "Hello" << endl;
@@ -89,7 +89,7 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
     {
         if ( VmbFrameStatusComplete == eReceiveStatus )
         {
-            StartReceiving = true; //Start the display when we start receiving
+            //StartReceiving = true; //Start the display when we start receiving
             
             //For counting the FPS
             //total_time += ((float)clock() - start)/CLOCKS_PER_SEC;
@@ -112,7 +112,7 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
     
             if( m_FPSReceived.isValid() )
             {
-                if(img_count%10 == 0)// Printing current fps
+                if(img_count%50 == 0)// Printing current fps
                 {
                     Print_FPS();
                 }
@@ -312,17 +312,17 @@ VmbErrorType Open_and_Start_Acquisition()
         return err;
     }
     cout << whatever << endl;*/
-    err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
+    /*err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
     err = pFeature -> SetValue("Average"); //Summing values when binning adjacent pixels
     err = pFeature -> IsWritable(writable1);
     
     err = cameras[0]->GetFeatureByName ( "BinningVertical", pFeature );
     err = pFeature -> SetValue(2); //dividing by 2 the original vertical resolution (the horizontal one is then divided automatically)
-    err = pFeature -> IsWritable(writable2);/**/
+    err = pFeature -> IsWritable(writable2);*/
     
-    double framerate, min, max;
+    /**/double framerate, min, max;
     err = cameras[0]->GetFeatureByName ( "Gain", pFeature );
-    err = pFeature -> SetValue(23.0f);
+    err = pFeature -> SetValue(20.0f);
     err = pFeature -> GetRange( min, max );
     cout << "(min : " << min << " / max : " << max << " )" << endl;
     if(VmbErrorSuccess != err){
@@ -335,7 +335,7 @@ VmbErrorType Open_and_Start_Acquisition()
     if(VmbErrorSuccess != err){
         cout << "Could not set exposure time" << endl;
         return err;
-    }/**/
+    }
     
     
     

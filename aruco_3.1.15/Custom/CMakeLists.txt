@@ -8,6 +8,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR MINGW OR ${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
 SET(THREADLIB "pthread")    #For using Threads
 ENDIF()
 
+set(CMAKE_BUILD_TYPE Debug) #Compiling with debug symbols
+
 
 FIND_PACKAGE( OpenCV REQUIRED )                              # 环境变量中寻找OpenCV的库的位置  
 INCLUDE_DIRECTORIES( ${OpenCV_INCLUDE_DIRS} ) #For including openCV
@@ -42,6 +44,8 @@ add_executable(Creation_markers create_marker.cpp) # Pour créer et imprimer les
 add_executable(Creation_board create_board.cpp) # Pour créer une board de markers
 add_executable(Calib_camera calibration_camera.cpp)
 add_executable(Aruco3_Calib aruco_calibration.cpp) # pour tester calibration aruco 3
+
+add_executable(TestAlviumCam test_Alvium_Camera.cpp) 
 add_executable(NewCamCalib Calib_new_cam.cpp) 
 
 ################
@@ -53,7 +57,7 @@ find_library(VimbaC_lib VimbaC  HINTS  ${CMAKE_SOURCE_DIR}/Custom/Vimba_6_0/Vimb
 message("VimbCPP lib : " ${VimbaCPP_lib}) 
 message("VimbC lib : " ${VimbaC_lib})
 
-target_include_directories(NewCamCalib  PRIVATE  ${CMAKE_SOURCE_DIR}/Custom/Vimba_6_0 )
+#target_include_directories(NewCamCalib  PRIVATE  ${CMAKE_SOURCE_DIR}/Custom/Vimba_6_0 )
 
 
 target_link_libraries(Aruco_Markers PRIVATE         helpers  aruco_lib  opencv_calib3d  opencv_highgui)
@@ -62,7 +66,9 @@ target_link_libraries(Creation_markers PRIVATE      aruco_lib  opencv_calib3d  o
 target_link_libraries(Creation_board PRIVATE        aruco_lib  opencv_calib3d  opencv_highgui)
 target_link_libraries(Calib_camera PRIVATE          helpers  aruco  opencv_calib3d  opencv_highgui)
 target_link_libraries(Aruco3_Markers PRIVATE        Alvium_Camera_Helpers  ${VimbaC_lib}  ${VimbaCPP_lib}  aruco  opencv_calib3d  opencv_highgui  Crow  ${THREADLIB} )
-target_link_libraries(Aruco3_Calib PRIVATE          helpers  aruco  opencv_calib3d  opencv_highgui  Calibrator  ${THREADLIB})
+target_link_libraries(Aruco3_Calib PRIVATE          Alvium_Camera_Helpers  ${VimbaC_lib}  ${VimbaCPP_lib}  aruco  opencv_calib3d  opencv_highgui  Calibrator  ${THREADLIB})
+
+target_link_libraries(TestAlviumCam  PRIVATE        Alvium_Camera_Helpers  ${VimbaC_lib}  ${VimbaCPP_lib}  opencv_calib3d  opencv_highgui  ${THREADLIB})
 target_link_libraries(NewCamCalib PRIVATE           Alvium_Camera_Helpers  ${VimbaC_lib}  ${VimbaCPP_lib}  aruco  opencv_calib3d  opencv_highgui  Calibrator  ${THREADLIB})
 
 #install(TARGETS Aruco_Markers Aruco3_Markers Creation_markers Calib_camera RUNTIME DESTINATION bin)

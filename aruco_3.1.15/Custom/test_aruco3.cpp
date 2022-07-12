@@ -7,7 +7,11 @@
 #define ENABLE_GPU_UPLOAD
 #endif
 
+
+/***************Different modes****************/
 //#define OLD_CAMERA 1 //For knowing if we are using the old or the new camera (COMMENT IF USING NEW CAMERA)
+//#define OFFLINE_TEST 1 //For knowing if we are testing the detection on opencv directly or with the server communication (COMMENT IF TESTING ONLINE)
+
 
 #ifdef OLD_CAMERA
 #include "v4l2_helper.h"
@@ -24,11 +28,12 @@
 #include <opencv2/video.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/core/cuda.hpp>
-
 #include "aruco.h"
 #include "markermap.h"
 
+#ifndef OFFLINE_TEST // (dont need webserver if we are offline testing)
 #include "crow.h"
+#endif
 
 #include <vector>
 #include <tuple>
@@ -55,10 +60,20 @@ using namespace std;
 #ifdef OLD_CAMERA
 int imgSizeX = 1920, imgSizeY = 1080;
 #else
-int imgSizeX = 2008, imgSizeY = 1518;
+int imgSizeX = 4024, imgSizeY = 3036;
 #endif
 
+////////////////Variables used for communicating with the server//////////////
+
+float ExposureTime = 9000.0f; //Exposure time, can be changed through the webserver
+float Gain = 20.0f; //Gain, can be changed through the webserver
+int Threshold = -1; //Detection Threshold, can be changed through the webserver
+int8_t Output_Video = 1; //For knowing if we are outputing the video as binary image or color image (By default, color image is sent) (0 no image, 1 color image, 2 binary image)
+
 float zOffset = 350; //position of the tool cursor on the z axis (in the tool markermap basis). Value will be changed by trackbar
+
+
+////////////////Variables used locally for the detection program//////////////
 
 bool exiting = false; //For the image getter/webserver to know when to stop 
 bool OneMarkerValid = false; //Check if the tool markermap is found
@@ -72,6 +87,8 @@ bool Calib_points = false; //Are we in calibration mode?
 bool Detect_points = false; //Are we in detection mode?
 bool RpressedOnce = false; //Knowing if we are registering a point but not the error margin yet (in calibration mode)
 bool print_relative_coord = true; //Do we print relative coordinates or camera coordinates?
+
+
 
 float sum_img = 0.0f, sum_comp = 0.0f;
 
@@ -570,7 +587,10 @@ void Detection_Points(cv::Mat imageCopy)
 }
 
 
-//Launch Crow WebServer asynchronously
+//Launch Crow WebServer asynchronously (if not offline testing)
+
+#ifndef OFFLINE_TEST
+
 void Launch_Crow_WebServer(){
 
     crow::SimpleApp app; //define your crow application
@@ -579,26 +599,89 @@ void Launch_Crow_WebServer(){
     std::cout << std::system("pwd") << std::endl;//Check the directory of the executable (from linux command "pwd")
     
     //define your endpoint at the root directory
-    CROW_ROUTE(app, "/").methods(crow::HTTPMethod::POST)([](){ // 
-    
-        //Setting new template directory
-        //crow::mustache::set_base("/home/rddoga/Desktop/WebSocket_test/jsmpeg");
-        
-        auto page = crow::mustache::load_text("view-stream.html"); // fancypage.html
+    CROW_ROUTE(app, "/test").methods(/*crow::HTTPMethod::POST,*/ crow::HTTPMethod::GET)([](const crow::request& req){ // 
 
+        crow::mustache::context ctx;
+        
+        auto page = crow::mustache::load("view-stream.html").render(); //html page
+        
+        std::string var = req.raw_url;
+        std::string Body = req.body;
+        cout << "Raw url received: " <<  var << endl;
+        cout << "req body : " << Body << endl; 
+        
+        //Checking if we changed the wanted camera output 
+        if(req.url_params.get("output") != nullptr )
+        {
+            //Print radio button value from URL
+            const char* out = req.url_params.get("output");
+            cout << "msg from client: " << out << endl; 
+            
+            if(strcmp(out, "Real") == 0){ //Output Color image
+                Output_Video = 1;
+            }
+            else if(strcmp(out, "Bin") == 0){ //Output Binary image
+                Output_Video = 2;
+            }
+            else if(strcmp(out, "Inactive") == 0){ //Don't output image
+                Output_Video = 0;
+            }
+        }
+        
+        //Checking if we changed the exposure time
+        if(req.url_params.get("Exposure_Time") != nullptr )
+        {
+            ExposureTime = std::stof(req.url_params.get("Exposure_Time"));
+        }
+        if(req.url_params.get("Gain") != nullptr )
+        {
+            Gain = std::stof(req.url_params.get("Gain"));
+        }
+        if(req.url_params.get("Threshold") != nullptr )
+        {
+            Threshold = std::stof(req.url_params.get("Threshold"));
+        }
+        /*
+        //cout << Body.find("output") << "   " << Body.find("Real") << "   " << Body.find("Bin") << endl;
+        
+        
+        //Checking if we find "output" ind the request body
+        if( Body.find("output") != string::npos  )
+        {
+            //Print radio button value from URL
+            //const char* out = Body.c_str();
+            //cout << "msg from client: " << out << endl; 
+            
+            //Then, checking if we find "Real" or "Bin", for knowing which image to display
+            
+            if( Body.find("Real") != string::npos ){  //strcmp(out, "Real") == 0
+                cout << "FOund Real" << endl;
+                Output_Video = false;
+            }
+            else if( Body.find("Bin") != string::npos ){  //strcmp(out, "Bin") == 0
+                cout << "FOund Bin" << endl;
+                Output_Video = true;
+            }
+        }       
+        else
+        {
+            cout << "No output chosen" << endl;
+        } */
        // crow::mustache::context ctx ({{"person", name}}); // 
 
-        return page; //
+        return page; 
     });
     
-    //set the port, set the app to run asynchronously
-    app.port(18080).run_async();
+    //set the port, set the app to run asynchronously (value is stored in a variable because for some reason it doesn't run asynchronously otherwise)
+    std::future< void > runner = app.port(18080).run_async();
+    
     
     //Wait for the bool "exiting" to be set to true by the main thread, then we can stop the app and join the threads
     while(!exiting);
     app.stop();
 
 }
+#endif
 
 
 
@@ -650,6 +733,32 @@ void Launch_Crow_WebServer(){
     cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
 }*/
 
+
+/*string type2str(int type) {
+  string r;
+
+  uchar depth = type & CV_MAT_DEPTH_MASK;
+  uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+  switch ( depth ) {
+    case CV_8U:  r = "8U"; break;
+    case CV_8S:  r = "8S"; break;
+    case CV_16U: r = "16U"; break;
+    case CV_16S: r = "16S"; break;
+    case CV_32S: r = "32S"; break;
+    case CV_32F: r = "32F"; break;
+    case CV_64F: r = "64F"; break;
+    default:     r = "User"; break;
+  }
+
+  r += "C";
+  r += (chans+'0');
+
+  return r;
+}*/
+
+
+
 /**********************************************/
 /*                                            */
 /******************** MAIN ********************/
@@ -670,6 +779,9 @@ int main(int argc, char** argv)
         //TimerAvrg timerFull, timerGetImage, timerComputation;
         //string posMarkerMapfile = "stacked.yml";
 
+        
+        
+#ifndef OFFLINE_TEST
         //Used for streaming video to web server
         //to hand opencv image by GStreamer
         cv::VideoWriter writer;
@@ -691,9 +803,7 @@ int main(int argc, char** argv)
             std::cout << "Could not open output file" << std::endl;
             exit(1); // or error handling
         }
-
-        //Buffer for sending raw image
-        //vector< uchar > buff;
+#endif      
         
         //Image that gets data from the frame pointer
 #ifdef OLD_CAMERA
@@ -716,13 +826,14 @@ int main(int argc, char** argv)
         //MDetector.setDictionary("ARUCO_MIP_16h3");
         MDetector.setDetectionMode(aruco::DM_FAST);
         
+        
         //Changing manually the parameters of the detector
         aruco::MarkerDetector::Params &params= MDetector.getParameters();
         
         params.cornerRefinementM = aruco::CORNER_LINES; //Corner refinement method
         params.maxThreads = -1; //Max threads used in parallel
         params.lowResMarkerSize = 5; //minimum size of a marker in the low resolution image
-        params.NAttemptsAutoThresFix = 2; //number of times that tries a random threshold in case of THRES_AUTO_FIXED
+        params.NAttemptsAutoThresFix = 1; //number of times that tries a random threshold in case of THRES_AUTO_FIXED
         params.error_correction_rate = 1; 
         
         
@@ -744,33 +855,40 @@ int main(int argc, char** argv)
             return -1;
         }
 #endif        
+      
         
-
-//Use opengl and cuda for speedup
-#if defined(ENABLE_GL_DISPLAY) && defined(ENABLE_GPU_UPLOAD)
-        std::cout << "Using CUDA\n";
-        cv::cuda::GpuMat gpu_frame;
-#else
-        std::cout << "Not using CUDA\n";
-#endif
-
-#ifdef ENABLE_GL_DISPLAY
-        std::cout << "Using openGL\n";
-        //cv::namedWindow("Tool", cv::WINDOW_OPENGL);
-        //cv::namedWindow("Thresh", cv::WINDOW_OPENGL);
-#else
-        std::cout << "Not using openGL\n";
-        //cv::namedWindow("Tool", cv::WINDOW_NORMAL);
-        //cv::namedWindow("Thresh", cv::WINDOW_NORMAL);
-#endif
-
+#ifdef OFFLINE_TEST
+    //Use opengl and cuda for speedup
+    #if defined(ENABLE_GL_DISPLAY) && defined(ENABLE_GPU_UPLOAD)
+            std::cout << "Using CUDA\n";
+            cv::cuda::GpuMat gpu_frame;
+    #else
+            std::cout << "Not using CUDA\n";
+    #endif
+    
+    //Creation of images to display
+    #ifdef ENABLE_GL_DISPLAY
+            std::cout << "Using openGL\n";
+            cv::namedWindow("Tool", cv::WINDOW_OPENGL);
+            //cv::namedWindow("Thresh", cv::WINDOW_OPENGL);
+    #else
+            std::cout << "Not using openGL\n";
+            cv::namedWindow("Tool", cv::WINDOW_NORMAL);
+            //cv::namedWindow("Thresh", cv::WINDOW_NORMAL);
+    #endif
+    
+        //Resizing for better display
+       // cv::resizeWindow("Thresh", 1920, 1080);
+        cv::resizeWindow("Tool", 1920, 1080);
+#endif 
+        
 //        cv::namedWindow("Tool", cv::WINDOW_GUI_EXPANDED);
         cv::namedWindow("Trackbars", cv::WINDOW_GUI_EXPANDED);
         
-        //cv::resizeWindow("Tool", 1920, 1080);
-        //cv::resizeWindow("Thresh", 1920, 1080);
+        //
+        
         //cv::resizeWindow("Trackbars", 100, 100);
-        cv::moveWindow("Trackbars",0,900);
+        cv::moveWindow("Trackbars",0,750);
         //Creating trackbars
         cv::createTrackbar("Calibration Z offset", "Trackbars", NULL, 2000);
         //cv::createTrackbar("Track 2", "Trackbars", NULL, 2000);
@@ -785,9 +903,11 @@ int main(int argc, char** argv)
         // multithreaded image getter
         ///std::thread t1(FrameGetter, std::ref(originalImage));
         //std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        
-        //Launching web server in another thread
+
+    //Launching web server in another thread (if testing online)
+#ifndef OFFLINE_TEST        
         std::thread t1(Launch_Crow_WebServer);
+#endif
         
         
 #ifndef OLD_CAMERA            
@@ -803,10 +923,12 @@ int main(int argc, char** argv)
         
         //Launch_Crow_WebServer(); //Launch Webserver asynchronously
         
-        
+        /////Timers
         cv::TickMeter tm_full, tm_image, tm_copy, tm_detect, tm_comp1, tm_comp2, tm_comp3;
-                    
+                   
+        /////////////////////////////////////////////////            
         ///////////////MAIN WHILE LOOP///////////////////
+        /////////////////////////////////////////////////
         while (key != 27){
             
             tm_full.start();
@@ -841,15 +963,37 @@ int main(int argc, char** argv)
             }    
             tm_image.stop();                  
 #else           
+            
             //NEW CAMERA
-            if(!StartReceiving){//Check if we started receiving
+            
+            //Changing features updated through webserver (if needed)
+            VmbErrorType err = cameras[0]->GetFeatureByName ( "Gain", pFeature );
+            err = pFeature -> SetValue(Gain);
+            //err = pFeature -> GetRange( min, max );
+            if(VmbErrorSuccess != err){
+                cout << "Could not set Gain" << endl;
+                return err;
+            }
+            
+            err = cameras[0]->GetFeatureByName ( "ExposureTime", pFeature );
+            err = pFeature -> SetValue(ExposureTime);
+            if(VmbErrorSuccess != err){
+                cout << "Could not set exposure time" << endl;
+                return err;
+            }
+    
+            
+            if(ptr_raw_frame == NULL){//Check if we started receiving
                 continue;
             }
              
             raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?)           
 #endif            
             
-
+            //Setting up threshold, if changed through webserver, before detection
+            if(Threshold > 0){
+                params.ThresHold = Threshold;
+            }
 
 #ifdef OLD_CAMERA                 
             //OLD CAMERA   
@@ -860,20 +1004,32 @@ int main(int argc, char** argv)
 #else            
             //NEW CAMERA
             tm_copy.start();
-            //Copy image to the right format
+            
+            // First resizing image to HD
+            cv::Mat imgtmp = cv::Mat(1080, 1920, CV_8UC3);
 
+            cv::resize(raw_frame, imgtmp, imgtmp.size(), 0, 0, cv::INTER_NEAREST);
+            
+            //Copy image to the right format
             cv::Mat imageCopy = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
             
-            cv::cvtColor(raw_frame, imageCopy, cv::COLOR_GRAY2BGR ); // for printing colored features on the image, and for better marker detection (because needs color image for input)
+            cv::cvtColor(imgtmp, imageCopy, cv::COLOR_GRAY2BGR ); // for printing colored features on the image, and for better marker detection (because needs color image for input)
             tm_copy.stop();
 #endif
 
             tm_detect.start();
             //detecting markers
-            vector<aruco::Marker> markers=MDetector.detect(imageCopy,camParameters,0.04);
-            //get thresholded image
-            cv::Mat Bin = MDetector.getThresholdedImage();
+            vector<aruco::Marker> markers=MDetector.detect(imageCopy,camParameters,0.02);
             //vector<aruco::Marker> markers=MDetector.detect(imageCopy);
+            
+            
+            //get thresholded image
+            cv::Mat imageBin = MDetector.getThresholdedImage();
+            cv::cvtColor(imageBin, imageBin, cv::COLOR_GRAY2BGR ); // for sending the image
+           /* string ty =  type2str( imageBin.type() );
+            printf("Matrix: %s %dx%d \n", ty.c_str(), imageBin.cols, imageBin.rows );*/
+
+
             tm_detect.stop();
             
             tm_comp1.start();
@@ -905,12 +1061,14 @@ int main(int argc, char** argv)
                     markers[i].draw(imageCopy, cv::Scalar(0, 0, 255), 2, false);
                 }
             }
-            tm_comp1.stop();
-            /*for(auto m:markers){
-                //aruco::CvDrawingUtils::draw3dAxis(imageCopy, camParameters, m.Rvec, m.Tvec, 0.1);
-                //aruco::CvDrawingUtils::draw3dCube(imageCopy, m, camParameters, 1);
+            
+            for(auto m:markers){
+                aruco::CvDrawingUtils::draw3dAxis(imageCopy, camParameters, m.Rvec, m.Tvec, 0.1);
+                aruco::CvDrawingUtils::draw3dCube(imageCopy, m, camParameters, 1);
                 //cout<<m.Rvec<<" "<<m.Tvec<<endl;
-            }*/
+            }
+            tm_comp1.stop();
+            
             
             tm_comp2.start();
             //For Preventing registration of many points at once if a key is pressed too long
@@ -1167,50 +1325,55 @@ int main(int argc, char** argv)
                             cv::putText(imageCopy, str_tool_coordinates, cv::Point(5, 50*(i+4)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 0), 2);
                         }
                     }
-                }/**/
-                
+                }/**/          
             }            
-            //if(cpt%20 == 0)
-            //    cout << "getting frame" << endl;
-
-            
             cpt++;
-            
-            cv::Mat imgPrint = cv::Mat(480,640, CV_8UC3); 
-            //resize down for printing the image
-            cv::resize(imageCopy, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);
-            
-#if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
-            //gpu_frame.upload(imgPrint);//resized_down
-            //cv::imshow("Tool", gpu_frame);
-#else
-            //cv::imshow("Tool", imgPrint);//resized_down
-#endif   
 
-            //cv::resize(imgPrint, imgPrint, cv::Size(480, 640), 0, 0, cv::INTER_NEAREST);
-            
-            //hand image to websocket by Gstreamer 
-            writer.write(imgPrint);
-            
-            /*std::vector<uchar> buff;
-            cv::imencode(".jpg", imgPrint, buff);
+#ifdef OFFLINE_TEST //If we are testing offline
+      
+           /* cv::Mat imgPrint = cv::Mat(1080, 1920, CV_8UC3);
 
-            // Send each image out to ffmpeg, in order to stream the video
+            cv::resize(imageCopy, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);*/
             
-            for (auto i = buff.begin(); i < buff.end(); i++){
-                std::cout << *i;
-            }*/
+    #if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
+                gpu_frame.upload(imageCopy);//resized_down
+                cv::imshow("Tool", gpu_frame);
+    #else
+                cv::imshow("Tool", imageCopy);//resized_down
+    #endif   
             
-            //string out(imgPrint.data, imgPrint.total() * imgPrint.elemSize());//
-            //cout << out; 
-           // cout << imgPrint.data << endl << endl << endl;
+            //Resizing and showing imageBin with opencv  
+            //cv::resize(imageBin, imageBin, cv::Size(1920, 1080), 0, 0, cv::INTER_NEAREST);
+            //cv::imshow("Thresh", imageBin);
             
-            //cv::imshow("Thresh", Bin);
+#else //If we are sending to the server        
+            cv::Mat imgPrint = cv::Mat(480, 640, CV_8UC3);            
+            //resize down for printing the image on the client
             
+            //Checking if we want to output video to the server
+            if(Output_Video != 0)
+            {
+                //If so, Checking if we want to output the binary image or the color image (to the server)
+                if(Output_Video == 1)
+                {
+                    //Color image output
+                    cv::resize(imageCopy, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);
+                }
+                else if(Output_Video == 2) 
+                {   //Binary image output
+                    cv::resize(imageBin, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);
+                }
+                
+                //then hand image to websocket by Gstreamer 
+                writer.write(imgPrint);
+            }
+#endif            
+
             tm_comp3.stop();
             
             tm_full.stop();
-        }
+            
+        } //END WHILE LOOP
 
 #ifdef OLD_CAMERA             
         // exiting program
@@ -1218,9 +1381,11 @@ int main(int argc, char** argv)
             fprintf(stderr, "Failed to deinitialise camera : %m\n");
 #endif      
 
+#ifndef OFFLINE_TEST
         exiting = true; //Indicate that we have to stop the image getter thread
         t1.join(); //Wait for the other thread to finish
-        
+#endif
+       
         //Clearing all windows
         cv::destroyAllWindows();
         
@@ -1254,12 +1419,12 @@ int main(int argc, char** argv)
 #ifdef OLD_CAMERA                    
         cout << "Average image catch time (old camera): " << tm_image.getAvgTimeSec() * 1000 << " ms" << std::endl;
 #endif         
-        cout << "Average image copy time (old camera): " << tm_copy.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average detection time (old camera): " << tm_detect.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average comp 1 time (old camera): " << tm_comp1.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average comp 2 time (old camera): " << tm_comp2.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average comp 3 time (old camera): " << tm_comp3.getAvgTimeSec() * 1000 << " ms" << std::endl;
-        cout << "Average full computation time (old camera): " << tm_full.getAvgTimeSec() * 1000 << " ms" << std::endl;  
+        cout << "Average image copy time : " << tm_copy.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average detection time : " << tm_detect.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 1 time : " << tm_comp1.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 2 time : " << tm_comp2.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average comp 3 time : " << tm_comp3.getAvgTimeSec() * 1000 << " ms" << std::endl;
+        cout << "Average full computation time : " << tm_full.getAvgTimeSec() * 1000 << " ms" << std::endl;  
         
         //std::cout << "Average full time (timer 2): " << ((sum_comp+sum_img)/cpt) * 1000 << " ms" << std::endl;
         cout << "Real average FPS  : "<< tm_full.getFPS() << " fps" << endl << endl;
