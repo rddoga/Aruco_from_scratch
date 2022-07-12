@@ -14,9 +14,14 @@
 //////////////////////////GLOBAL VARIABLES (Needed by .cpp file)
 
 //Variables that need to be used both in the main and the source file
-extern bool StartReceiving;
+//extern bool StartReceiving;
+
 extern unsigned char* ptr_raw_frame; //For taking the raw image data
 extern int img_count;          //For FPS count
+
+//For accessing camera object and changing features at runtime
+extern AVT::VmbAPI::CameraPtrVector cameras ; 
+extern AVT::VmbAPI::FeaturePtr pFeature ;
 
 
 

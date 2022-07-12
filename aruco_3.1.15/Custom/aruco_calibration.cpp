@@ -36,11 +36,19 @@ or implied, of Rafael Muñoz Salinas.
 #define ENABLE_GPU_UPLOAD
 #endif
 
+//#define OLD_CAMERA 1 //For knowing if we are using the old or the new camera (COMMENT IF USING NEW CAMERA)
+
+#ifdef OLD_CAMERA
+#include "v4l2_helper.h"
+
+#else
+#include "Alvium_Camera.h"
+
+#endif
 
 #include "aruco.h"
 #include "calibrator.h"
-#include "v4l2_helper.h"
-#include "utils.h"
+
 
 #include <fstream>
 #include <iostream>
@@ -56,20 +64,34 @@ using namespace std;
 using namespace cv;
 using namespace aruco;
 
+
+#ifdef OLD_CAMERA
+unsigned int imgSizeX = 1920; // x pixel image size
+unsigned int imgSizeY = 1080; // y pixel image size
+#else
+unsigned int imgSizeX = 4024; // x pixel image size
+unsigned int imgSizeY = 3036; // y pixel image size
+#endif
+
 CameraParameters TheCameraParameters;
 MarkerDetector TheMarkerDetector;
 vector<vector<aruco::Marker>> allMarkers;
 string TheOutCameraParams;
 aruco::CameraParameters camp;  // camera parameters estimated
 Calibrator calibrator;
-unsigned int imgSizeX = 1920; // x pixel image size
-unsigned int imgSizeY = 1080; // y pixel image size
+
+#ifdef OLD_CAMERA
 cv::Mat yuyv_frame(imgSizeY, imgSizeX, CV_8UC2);    // raw image
 cv::Mat originalImage(imgSizeX, imgSizeY, CV_8UC3); // converted image
-cv::Mat image(imgSizeX, imgSizeY, CV_8UC3);         // saved image
+cv::Mat image(imgSizeX, imgSizeY, CV_8UC3);         // saved image (old camera)
+#else
+cv::Mat raw_frame(imgSizeY, imgSizeX, CV_8UC1);    // raw image
+cv::Mat originalImage(imgSizeX, imgSizeY, CV_8UC1); // copied image
+#endif
+
 bool exiting = false;
 
-aruco::CameraParameters cameraCalibrate(std::vector<std::vector<aruco::Marker> >  &allMarkers, int imageWidth,int imageHeight,float markerSize,float *currRepjErr=0, aruco::MarkerMap *inmmap=0);
+//aruco::CameraParameters cameraCalibrate(std::vector<std::vector<aruco::Marker> >  &allMarkers, int imageWidth,int imageHeight,float markerSize,float *currRepjErr=0, aruco::MarkerMap *inmmap=0);
 
 /************************************
  *
@@ -77,17 +99,18 @@ aruco::CameraParameters cameraCalibrate(std::vector<std::vector<aruco::Marker> >
  *
  ************************************/
 
+#ifdef OLD_CAMERA
 void FrameGetter()
 {
-    TimerAvrg timerGetImage;
-    TimerAvrg timerConv;
+    /*TimerAvrg timerGetImage;
+    TimerAvrg timerConv;*/
 
     unsigned char* ptr_cam_frame;
     int bytes_used;
 
     while(!exiting)
     {
-        timerGetImage.start();
+        //timerGetImage.start();
 
         if (helper_get_cam_frame(&ptr_cam_frame, &bytes_used) < 0)
         {
@@ -102,15 +125,16 @@ void FrameGetter()
             break;
         }
 
-        timerGetImage.stop();
+        //timerGetImage.stop();
     }
 
     // exiting program
     if (helper_deinit_cam() < 0)
         fprintf(stderr, "Failed to deinitialise camera : %m\n");
 
-    std::cout << "Average image catch time : "<< timerGetImage.getAvrg() * 1000 << " ms /!\\ keep in mind this is multithreaded\n";
+    //std::cout << "Average image catch time : "<< timerGetImage.getAvrg() * 1000 << " ms /!\\ keep in mind this is multithreaded\n";
 }
+#endif
 
 /************************************
  *
@@ -130,13 +154,16 @@ int main(int argc, char** argv)
             return -1;
         }
 
+#ifdef OLD_CAMERA
         if(helper_init_cam("/dev/video0", imgSizeX, imgSizeY, V4L2_PIX_FMT_UYVY, IO_METHOD_USERPTR) < 0) // or V4L2_PIX_FMT_YUYV
         {
             fprintf(stderr, "Failed to open video : %m\n");
             return -1;
         }
+#endif
 
-/*#if defined(ENABLE_GL_DISPLAY) && defined(ENABLE_GPU_UPLOAD)
+
+#if defined(ENABLE_GL_DISPLAY) && defined(ENABLE_GPU_UPLOAD)
         std::cout << "Using CUDA\n";
 	cuda::GpuMat gpu_frame;
 #else
@@ -149,7 +176,7 @@ int main(int argc, char** argv)
 #else
         std::cout << "Not using openGL\n";
 	namedWindow("in", cv::WINDOW_NORMAL);
-#endif*/
+#endif
 
         cv::resizeWindow("in", 1920, 1080);
 
@@ -160,70 +187,150 @@ int main(int argc, char** argv)
         TheMarkerDetector.setDictionary("ARUCO_MIP_36h12");
         TheMarkerDetector.setDetectionMode(aruco::DM_NORMAL);
 
-        TimerAvrg timerFull;
+        /*TimerAvrg timerFull;
         TimerAvrg timerDetect;
-        TimerAvrg timerDisplay;
+        TimerAvrg timerDisplay;*/
 
         char key = 0;
         int waitKeyTime = 1;
-	    
+	  
+#ifdef OLD_CAMERA 
 	// capture until press ESC
         std::thread t1(FrameGetter);
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
+#else          
+        //NEW CAMERA
+        //Startup and start image acquisition
+        if(VmbErrorSuccess != Open_and_Start_Acquisition() ){
+            //throw Cam_Exception("Openning / Start Acquisition error !");
+            cout << "Openning / Start Acquisition error !" << endl;
+            return -1;
+        }
+#endif   
+
+        cv::TickMeter tm_full, tm_resize1, tm_resize2, tm_resize3, tm_detect, tm_end;
+        
         while (key != 27)
         {
-            timerFull.start();
-
+            tm_full.start();
+            
+            //timerFull.start();
+            key = cv::waitKey(waitKeyTime);   // wait for key to be pressed
+            
+            
+            
+#ifdef OLD_CAMERA
             // get frame
             image = originalImage.clone();
-
-            // detect
-            timerDetect.start();
+            
+            tm_detect.start();
             vector<aruco::Marker> detected_markers = TheMarkerDetector.detect(image);
-            timerDetect.stop();
+            tm_detect.stop();
             
             // print markers from the board
-            timerDisplay.start();
+            //timerDisplay.start();
             for (auto m: detected_markers)
                 m.draw(image, Scalar(0, 0, 255), 1);
+
+            
             // draw help
             cv::putText(image, "'a' add current image for calibration", cv::Point(10,40), FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920., cv::Scalar(125,255,255), 2);
             cv::putText(image, "'esc' save and quit", cv::Point(10,80), FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920., cv::Scalar(125,255,255), 2);
             cv::putText(image, calibrator.getInfo(), cv::Point(10,120), FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920., cv::Scalar(125,255,255), 2);
-/*
-#if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
-		    gpu_frame.upload(image);
-		    imshow("in", gpu_frame);
-#else*/
-		    imshow("in", image);
-//#endif
-            timerDisplay.stop();
+            
+    #if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
+		        gpu_frame.upload(image);
+		        imshow("in", gpu_frame);
+    #else
+		        imshow("in", image);
+    #endif
+    
+#else //IF new camera
 
-            key = cv::waitKey(waitKeyTime);   // wait for key to be pressed
+
+            if(ptr_raw_frame == NULL){//Check if we started receiving
+                continue;
+            }
+            
+            //Filling image data
+            raw_frame.data = ptr_raw_frame;
+            originalImage = raw_frame.clone();
+            
+            cv::Mat imgtmp = cv::Mat(3036, 4024, CV_8UC1);
+            // for printing colored features on the image, and for better marker detection (because needs color image for input)
+            cv::cvtColor(originalImage, imgtmp, cv::COLOR_GRAY2BGR ); 
+            
+            cv::Mat resized_down = cv::Mat(1080, 1920, CV_8UC3);
+            //resize down for printing the image
+            cv::resize(imgtmp, resized_down, resized_down.size(), 0, 0, cv::INTER_NEAREST);
+            
+            // detect
+            tm_detect.start();
+            vector<aruco::Marker> detected_markers = TheMarkerDetector.detect(resized_down);
+            tm_detect.stop();
+            
+            // print markers from the board
+            //timerDisplay.start();
+            for (auto m: detected_markers)
+                m.draw(resized_down, Scalar(0, 0, 255), 1);
+
+            
+            // draw help
+            cv::putText(resized_down, "'a' add current image for calibration", cv::Point(10,40), FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920., cv::Scalar(125,255,255), 2);
+            cv::putText(resized_down, "'esc' save and quit", cv::Point(10,80), FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920., cv::Scalar(125,255,255), 2);
+            cv::putText(resized_down, calibrator.getInfo(), cv::Point(10,120), FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920., cv::Scalar(125,255,255), 2);
+
+            
+    #if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
+		        gpu_frame.upload(resized_down);
+		        imshow("in", gpu_frame);
+    #else
+		        imshow("in", resized_down);
+    #endif
+      
+#endif
+
+            //timerDisplay.stop();
+
+            
             if (key == 'a')
                 calibrator.addView(detected_markers);
 
-            timerFull.stop();
-        }
+            tm_full.stop();
+            
+        } ////////////END OF WHILE LOOP
 
         aruco::CameraParameters camp;
         if (calibrator.getCalibrationResults(camp))
         {
-            camp.saveToFile("cam_calibration_3.yml");
+            camp.saveToFile("../cam_calibration_3.yml");
             cout << "results saved to cam_calibration.yml\n";
         }
         else
             cerr << "Could not obtain calibration\n";
-	    
-	cv::destroyAllWindows();
+	        
+	    cv::destroyAllWindows();
 
         std::cout << "\n";
         cout << "Final error= " << calibrator.getReprjError() << "\n";
+
+#ifdef  OLD_CAMERA        
         exiting = true;
         t1.join();
-        std::cout << "Detection : "<< timerDetect.getAvrg() * 1000 << " ms\n";
-        std::cout << "Display : "<< timerDisplay.getAvrg() * 1000 << " ms\n";
-        std::cout << "Average FPS : "<< 1./timerFull.getAvrg() << " fps\n";
+#else           
+        //NEW CAMERA
+        //Stop image acquisition and shutdown camera and API
+        if(VmbErrorSuccess != Stop_Acquisition_and_Close() ){
+            //throw Cam_Exception("Closing / Stop Acquisition error !");/**/
+            cout << "Closing / Stop Acquisition error !" << endl;
+            return -1;
+        }
+#endif  
+
+        cout << "Average detection time: " << tm_detect.getAvgTimeSec()*1000 << " ms" << endl;
+        //cout << "Average end computation time: " << tm_end.getAvgTimeSec()*1000 << " ms" << endl;
+        cout << "Average full computation time: " << tm_full.getAvgTimeSec()*1000 << " ms" << endl;
+
     }
     catch (std::exception& ex)
     {

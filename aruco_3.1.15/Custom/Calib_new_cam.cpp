@@ -112,7 +112,7 @@ int main(int argc, char* argv[])
         
         
         //configure the calibrator
-        calibrator.setParams(cv::Size(imgSizeX, imgSizeY), 0.04, "");
+        calibrator.setParams(cv::Size(imgSizeX, imgSizeY), 0.0395, "");
         
         /*aruco::MarkerDetector::Params &params= TheMarkerDetector.getParameters();
         
@@ -213,7 +213,7 @@ int main(int argc, char* argv[])
             tm_resize1.start();
             key = cv::waitKey(1) & 0xFF;
             
-            if(!StartReceiving){//Check if we started receiving
+            if(ptr_raw_frame == NULL){//Check if we started receiving
                 continue;
             }
              
@@ -226,10 +226,13 @@ int main(int argc, char* argv[])
             tm_resize3.start();
             
             cv::Mat imgtmp = cv::Mat(1080, 1920, CV_8UC1); 
-                        
+                       
             //cv::Mat resized_down = cv::Mat(1080, 1920, CV_8UC3);
             //resize down for printing the image
             //cv::resize(raw_frame, imgtmp, imgtmp.size(), 0, 0, cv::INTER_NEAREST);
+            
+            
+//PB !!!!!!!!!!!!!!! imgtmp and raw_frame DIFFERENT SIZE !!!!!!!!!!!!!!!!
             cv::cvtColor(raw_frame, imgtmp, cv::COLOR_GRAY2BGR ); // for printing colored features on the image, and for better marker detection (because needs color image for input)
             
             tm_resize3.stop();
