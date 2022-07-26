@@ -1,0 +1,3 @@
+[submodule "aruco_3.1.15/build/templates/jsmpeg"]
+	path = aruco_3.1.15/build/templates/jsmpeg
+	url = https://github.com/phoboslab/jsmpeg.git

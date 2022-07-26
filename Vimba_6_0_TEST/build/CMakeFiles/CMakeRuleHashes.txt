@@ -1,0 +1,2 @@
+# Hashes of file build rules.
+cc33f03734e7c930d960db2526dc6dbb CMakeFiles/NewCam_autogen

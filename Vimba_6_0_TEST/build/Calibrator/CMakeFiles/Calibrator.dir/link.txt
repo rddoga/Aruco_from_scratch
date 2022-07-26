@@ -1,0 +1,2 @@
+/usr/bin/ar qc libCalibrator.a  CMakeFiles/Calibrator.dir/src/calibrator.cpp.o CMakeFiles/Calibrator.dir/Calibrator_autogen/mocs_compilation.cpp.o
+/usr/bin/ranlib libCalibrator.a

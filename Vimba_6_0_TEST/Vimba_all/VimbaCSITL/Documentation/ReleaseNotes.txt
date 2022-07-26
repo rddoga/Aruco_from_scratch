@@ -1,0 +1,72 @@
+===========================================================================
+
+  Vimba CSI Transport Layer - Release Notes 
+  
+  Version: 1.0.1
+  Date:    January 2022
+===========================================================================
+
+--------------------------------
+Components and Version Reference  
+--------------------------------
+
+
+Vimba GenIcam Transport Layer modules
+-------------------------------------
+  CSI-2 Transport Layer (VimbaCSITL.cti)                                 1.0.1*
+ 
+-----------------------------
+Supported hardware and driver
+-----------------------------
+NVIDIA Jetson AGX Xavier and Xavier NX with JetPack 4.5.1 (L4T 32.5.1)
+and driver for Allied Vision Alvium cameras:
+https://github.com/alliedvision/linux_nvidia_jetson
+
+Supported CSI-2 camera models and more information:
+https://alliedvision.com/fileadmin/content/documents/products/software/software/embedded/Getting_started_with_GenICam_for_CSI.pdf
+
+------------
+Installation
+------------            
+Before installing Vimba, please install JetPack 4.5.1 (L4T 32.5.1) and the
+driver for Allied Vision Alvium cameras:
+https://github.com/alliedvision/linux_nvidia_jetson
+
+The Vimba CSI Transport Layer is part of the Vimba SDK. For more information,
+see the Vimba Manual.
+
+-------------------------------------------------------
+Correlations with other Allied Vision Software Packages
+-------------------------------------------------------
+Please refer to the Vimba SDK Release Notes.
+
+
+-------------------------------------------------------
+Known issues
+-------------------------------------------------------
+  - Please use “alloc and announce” for best performance, see the AsynchrounousGrab example.
+    (C++: Program.Config.h, optional parameter /x, C: Program.c, optional parameter /x, Python: 
+    optional parameter /x). 
+  - Switching the camera from GenICam for CSI-2 to V4L2 or vice versa requires rebooting the board
+  - Exposure times greater than approx. 1 second: Stopping acquisition may cause an error. Please 
+    close and open the camera to start streaming again.
+  - Executing the Device Reset GenICam command leads to camera communication failures.
+  - Not all ROIs work when Mono8 is applied.
+  - When a ROI or a different pixel format is applied and the camera is closed and opened again, image 
+    acquisition doesn’t start in some cases. To enable image acquisition again, open the camera with 
+    Vimba Viewer (even if you set the ROI with a third-party viewer). In some cases, rebooting 
+    the board is necessary.
+  - Issues that may occur occasionally:
+      - AGX Xavier: Camera stays in locked state after camera handle is closed
+
+
+Changes in Vimba 6.0.0:
+-----------------------
+Vimba CSITL new release
+
+
+----------------------------------------
+Allied Vision Technical Support
+----------------------------------------
+Contact us:
+https://www.alliedvision.com/contact
