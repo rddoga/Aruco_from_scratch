@@ -10,7 +10,7 @@
 
 /***************Different modes****************/
 //#define OLD_CAMERA 1 //For knowing if we are using the old or the new camera (COMMENT IF USING NEW CAMERA)
-//#define OFFLINE_TEST 1 //For knowing if we are testing the detection on opencv directly or with the server communication (COMMENT IF TESTING ONLINE)
+#define OFFLINE_TEST 1 //For knowing if we are testing the detection on opencv directly or with the server communication (COMMENT IF TESTING ONLINE)
 
 
 #ifdef OLD_CAMERA
@@ -41,9 +41,10 @@
 #include <fstream>
 #include <chrono>
 #include <thread>
-#include <stdexcept> 
+//#include <stdexcept> 
 
 using namespace std;
+using namespace cv;
 //using namespace aruco;
 
 /***************************************************/
@@ -72,6 +73,37 @@ int8_t Output_Video = 1; //For knowing if we are outputing the video as binary i
 
 float zOffset = 350; //position of the tool cursor on the z axis (in the tool markermap basis). Value will be changed by trackbar
 
+bool Register_P = false; //Becomes true when we receive a request from the server ordering to register a point
+bool Register_M = false; //Becomes true when we receive a request from the server ordering to register an error margin
+
+bool RegOrigin = false; //Becomes true when we receive a request from the server ordering to register the origin of the relative Basis
+bool RegXAxis = false; //Becomes true when we receive a request from the server ordering to register the X axis of the relative Basis
+bool RegYAxis = false; //Becomes true when we receive a request from the server ordering to register the Y axis of the relative Basis
+
+bool RemoveLastRegistered = false; //Becomes true when we receive a request from the server ordering to delete the last registered point
+
+bool Detecting = false; //Becomes true when we receive a request from the server ordering to check if a point is detected by the tooltip
+int Point_Detected; //Detected point to send to the server
+
+
+//////////////////////// Image that gets data from the frame pointer 
+////////////////////////  AS GLOBAL VARIABLES (NEEDED)
+
+#ifdef OLD_CAMERA
+        //OLD CAMERA
+        //Raw frame
+        cv::Mat yuyv_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC2);
+        //Original image, that gets the cam frame from the pointer
+        cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
+        //copied image, for printing the markers on the screen
+        cv::Mat imageCopy;
+#else
+        //NEW CAMERA
+        //raw frame
+        cv::Mat raw_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC1);   
+        //copied image
+        cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC1);
+#endif  
 
 ////////////////Variables used locally for the detection program//////////////
 
@@ -84,8 +116,8 @@ bool IsStaticSet = false; //Do we need to set static basis?
 
 bool definePlane = true; //Do we need to define a plane (i.e are we in static mode?)
 bool Calib_points = false; //Are we in calibration mode?
-bool Detect_points = false; //Are we in detection mode?
-bool RpressedOnce = false; //Knowing if we are registering a point but not the error margin yet (in calibration mode)
+//bool Detect_points = false; //Are we in detection mode?
+bool RegisterErrMargin = false; //Knowing if we are registering a point or its error margin (in calibration mode)
 bool print_relative_coord = true; //Do we print relative coordinates or camera coordinates?
 
 
@@ -111,6 +143,7 @@ cv::Mat relativeRTmatInv(4, 4, CV_32F);             // static relative basis inv
 cv::Mat Real_coordinates; //For the coordinates of the tool tip (in the camera basis)
 cv::Mat Relative_coordinates = cv::Mat::zeros(4, 1, CV_32F); //For the coordinates of the tool tip in the relative basis (either static or the relative markermap) 
 vector< std::tuple< cv::Mat, cv::Mat, double, double > > registeredPoints; //3d coordinates in camera basis, 3D coordinates in relative basis, error margin (circle), error margin in pixels (circle) of the registered points
+
 //vector< cv::Mat > Points_tool_coord; //Coordinates of the points in the tool basis
 
 ////////Aruco objects for detection//////
@@ -331,6 +364,10 @@ void SetOrigin(const char &key, cv::Mat imageCopy)
     /////////Check first if we can find the tool markermap
     if(!OneMarkerValid)
     {
+        //Disabling the flags, because we will need to wait for another request from the server
+        RegOrigin = false;
+        RegXAxis = false;
+        RegYAxis = false;
         return;
     }
     
@@ -346,9 +383,11 @@ void SetOrigin(const char &key, cv::Mat imageCopy)
     cv::projectPoints(objectPoint, MMTracker.getRvec(), MMTracker.getTvec(), camParameters.CameraMatrix, camParameters.Distorsion, imgPoint); */
         
         
-    // register origin when R pressed
-    if (key == 'o' || key == 'O')
+    // register Origin and Axis when R pressed (Or when request from the server is received)
+    if ( (key == 'o' | key == 'O') || (definePlane && planePoints.size() == 0 && RegOrigin) || (definePlane && planePoints.size() == 1 && RegXAxis) || (definePlane && planePoints.size() == 2 && RegYAxis) )
     {
+        
+        
         //For having a 3 channels Mat (instead of 4) of the 3d coordinates of the points (in the camera basis)
         cv::Point3d coordinates;
         coordinates.x = Real_coordinates.at<float>(0, 0);
@@ -450,6 +489,8 @@ void SetOrigin(const char &key, cv::Mat imageCopy)
         }
     }
     
+    
+    
         
     if (definePlane && planePoints.size() == 1)
     {
@@ -467,83 +508,120 @@ void SetOrigin(const char &key, cv::Mat imageCopy)
     {
         
     }
+    
+    //Setting the flags back to false (because we want only on registerd point at a time)
+    RegOrigin = false;
+    RegXAxis = false;
+    RegYAxis = false;
 }
+
 
 
 //For registering points and error margin
 void Calibration_Points(const char &key,  cv::Mat imageCopy)
 {
-    if(key == 'r' | key == 'R'){
+    
+    //Check if we want to register a point
+    if( (key == 'r' | key == 'R' | Register_P == true) && !RegisterErrMargin )
+    {
         
-        if(!RpressedOnce)
-        {
-            //For having a 3 channels Mat (instead of 4) of the coordinates in the camera basis
-            cv::Mat coordinates = cv::Mat(3, 1, CV_32FC1);
-            coordinates.at<float>(0, 0) = Real_coordinates.at<float>(0, 0);
-            coordinates.at<float>(1, 0) = Real_coordinates.at<float>(1, 0);
-            coordinates.at<float>(2, 0) = Real_coordinates.at<float>(2, 0);
+        
+        //For having a 3 channels Mat (instead of 4) of the coordinates in the camera basis
+        cv::Mat coordinates = cv::Mat(3, 1, CV_32FC1);
+        coordinates.at<float>(0, 0) = Real_coordinates.at<float>(0, 0);
+        coordinates.at<float>(1, 0) = Real_coordinates.at<float>(1, 0);
+        coordinates.at<float>(2, 0) = Real_coordinates.at<float>(2, 0);
+        
+        
+        //Same (for relative basis)
+        cv::Mat Curr_Rel_coordinates = cv::Mat(3, 1, CV_32FC1);
+        Curr_Rel_coordinates.at<float>(0, 0) = Relative_coordinates.at<float>(0, 0);
+        Curr_Rel_coordinates.at<float>(1, 0) = Relative_coordinates.at<float>(1, 0);
+        Curr_Rel_coordinates.at<float>(2, 0) = Relative_coordinates.at<float>(2, 0);
             
-            
-            //Same (for relative basis)
-            cv::Mat Curr_Rel_coordinates = cv::Mat(3, 1, CV_32FC1);
-            Curr_Rel_coordinates.at<float>(0, 0) = Relative_coordinates.at<float>(0, 0);
-            Curr_Rel_coordinates.at<float>(1, 0) = Relative_coordinates.at<float>(1, 0);
-            Curr_Rel_coordinates.at<float>(2, 0) = Relative_coordinates.at<float>(2, 0);
-                
-            //if(IsStatic)
-            //{
-                //Then find the coordinates in the relative basis
-                //Relative_coordinates = relativeRTmat.inv() * Real_coordinates;
-            //}
- 
-            
-            //remember the new 3D point (in both coordinates)
-            auto tup = std::make_tuple(coordinates, Curr_Rel_coordinates, 0.0f, 0.0f);
-            registeredPoints.push_back(tup);
-            
-            DrawnImgPoints.push_back(ImagePoint.at(0) );//Remember the new 2D point
-            RpressedOnce = true;
-        }
-        else
-        {
-            //For having a 3 channels Mat (instead of 4)
-            /*cv::Mat coordinates = cv::Mat(3, 1, CV_32FC1);
-            coordinates.at<float>(0, 0) = Real_coordinates.at<float>(0, 0);
-            coordinates.at<float>(1, 0) = Real_coordinates.at<float>(1, 0);
-            coordinates.at<float>(2, 0) = Real_coordinates.at<float>(2, 0);*/
-            
-            cv::Mat Curr_Rel_coordinates = cv::Mat(3, 1, CV_32FC1);
-            Curr_Rel_coordinates.at<float>(0, 0) = Relative_coordinates.at<float>(0, 0);
-            Curr_Rel_coordinates.at<float>(1, 0) = Relative_coordinates.at<float>(1, 0);
-            Curr_Rel_coordinates.at<float>(2, 0) = Relative_coordinates.at<float>(2, 0);
-            
-            //Finding the error circle radius
-            //float disterror = norm(coordinates, std::get<0>(registeredPoints.back()), cv::NORM_L2, cv::noArray() );
-            
-            float disterror = norm(Curr_Rel_coordinates, std::get<1>(registeredPoints.back()), cv::NORM_L2, cv::noArray() );
-            
-            
-            //remember the error circle radius
-            std::get<2>(registeredPoints.back()) = disterror;
-            
-            //Variables for finding the 2D radius
-            vector <cv::Point2f> center;
-            
-            //cv::projectPoints( std::get<1>(registeredPoints.back()), IsStatic ? relativeRvec : MMRelativeTracker.getRvec(), IsStatic ? relativeTvec : MMTracker.getTvec(), camParameters.CameraMatrix, camParameters.Distorsion, center); //Project the 3d points in 2d
-            center.push_back(DrawnImgPoints.back() );
-            vector <cv::Point2f> border;
-            //cv::projectPoints(Curr_Rel_coordinates, IsStatic ? relativeRvec : MMRelativeTracker.getRvec(), IsStatic ? relativeTvec : MMTracker.getTvec(), camParameters.CameraMatrix, camParameters.Distorsion, border); //Project the 3d points in 2d
-            border.push_back(ImagePoint.at(0) );
-            
-            //Finding the circle radius
-            float disterror2D = norm(center, border, cv::NORM_L2);
-            
-            std::get<3>(registeredPoints.back()) = disterror2D;
-            
-            RpressedOnce = false;
-        }
+        //if(IsStatic)
+        //{
+            //Then find the coordinates in the relative basis
+            //Relative_coordinates = relativeRTmat.inv() * Real_coordinates;
+        //}
+
+        
+        //remember the new 3D point (in both coordinates)
+        auto tup = std::make_tuple(coordinates, Curr_Rel_coordinates, 0.0f, 0.0f);
+        registeredPoints.push_back(tup);
+        
+        //Remember the new 2D projected point
+        DrawnImgPoints.push_back(ImagePoint.at(0) );
+        RegisterErrMargin = true;
+        
+        //Put registering flags back to false (because we need only one registration per request) 
+        Register_P = false;
+        Register_M = false;
+    
     }
     
+    //Check if we want to register an error margin
+    if( (key == 'e' | key == 'E' | Register_M == true) && RegisterErrMargin )
+    {
+        
+        
+        //For having a 3 channels Mat (instead of 4)
+        /*cv::Mat coordinates = cv::Mat(3, 1, CV_32FC1);
+        coordinates.at<float>(0, 0) = Real_coordinates.at<float>(0, 0);
+        coordinates.at<float>(1, 0) = Real_coordinates.at<float>(1, 0);
+        coordinates.at<float>(2, 0) = Real_coordinates.at<float>(2, 0);*/
+        
+        cv::Mat Curr_Rel_coordinates = cv::Mat(3, 1, CV_32FC1);
+        Curr_Rel_coordinates.at<float>(0, 0) = Relative_coordinates.at<float>(0, 0);
+        Curr_Rel_coordinates.at<float>(1, 0) = Relative_coordinates.at<float>(1, 0);
+        Curr_Rel_coordinates.at<float>(2, 0) = Relative_coordinates.at<float>(2, 0);
+        
+        //Finding the error circle radius
+        //float disterror = norm(coordinates, std::get<0>(registeredPoints.back()), cv::NORM_L2, cv::noArray() );
+        
+        float disterror = norm(Curr_Rel_coordinates, std::get<1>(registeredPoints.back()), cv::NORM_L2, cv::noArray() );
+        
+        
+        //remember the error circle radius
+        std::get<2>(registeredPoints.back()) = disterror;
+        
+        //Variables for finding the 2D radius
+        vector <cv::Point2f> center;
+        
+        //cv::projectPoints( std::get<1>(registeredPoints.back()), IsStatic ? relativeRvec : MMRelativeTracker.getRvec(), IsStatic ? relativeTvec : MMTracker.getTvec(), camParameters.CameraMatrix, camParameters.Distorsion, center); //Project the 3d points in 2d
+        center.push_back(DrawnImgPoints.back() );
+        vector <cv::Point2f> border;
+        //cv::projectPoints(Curr_Rel_coordinates, IsStatic ? relativeRvec : MMRelativeTracker.getRvec(), IsStatic ? relativeTvec : MMTracker.getTvec(), camParameters.CameraMatrix, camParameters.Distorsion, border); //Project the 3d points in 2d
+        border.push_back(ImagePoint.at(0) );
+        
+        //Finding the circle radius
+        float disterror2D = norm(center, border, cv::NORM_L2);
+        
+        std::get<3>(registeredPoints.back()) = disterror2D;
+        
+        RegisterErrMargin = false;
+        
+        //Put registering flags back to false (because we need only one registration per request) 
+        Register_P = false;
+        Register_M = false;
+    
+    }
+    
+    //Check if we want to remove the last saved point
+    if(key == 'x' | key == 'X' | RemoveLastRegistered)
+    {
+        //Stop registering error margin of that last point (if we are in that phase)
+        RegisterErrMargin = false;
+        
+        //Delete the last registered point and its 2D projection (if there exists registered points)
+        if(registeredPoints.size() > 0){
+            registeredPoints.pop_back();
+            DrawnImgPoints.pop_back();
+        }
+        
+        //Put remove flag back to false (because we need only one per request) 
+        RemoveLastRegistered = false;
+    }
     /*if(DrawnImgPoints.size() > 0)
     {
         for (int i=0; i < DrawnImgPoints.size(); i++){
@@ -554,6 +632,7 @@ void Calibration_Points(const char &key,  cv::Mat imageCopy)
         }
     }*/
 }
+
 
 void Detection_Points(cv::Mat imageCopy)
 {
@@ -568,6 +647,8 @@ void Detection_Points(cv::Mat imageCopy)
     Curr_Rel_coordinates.at<float>(1, 0) = Relative_coordinates.at<float>(1, 0);
     Curr_Rel_coordinates.at<float>(2, 0) = Relative_coordinates.at<float>(2, 0);
     
+    //return to zero
+    Point_Detected = 0;
     
     for(int i = 0; i < registeredPoints.size(); i++)
     {
@@ -577,14 +658,24 @@ void Detection_Points(cv::Mat imageCopy)
         //If the tool tip appears to be inside the error radius of the current point, write in green, if not write in red
         if( disterror < std::get<2>(registeredPoints.at(i)) )
         {
-            cv::putText(imageCopy, to_string(i), cv::Point(5, 50*(i+2)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 255, 0), 2);
+            cv::putText(imageCopy, to_string(i), cv::Point(1800, 50*(i+2)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 255, 0), 2);
+            
+            //For informing the server which point has be detected
+            Point_Detected = i+1;
         }
         else
         {
-            cv::putText(imageCopy, to_string(i), cv::Point(5, 50*(i+2)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 0, 255), 2);
+            cv::putText(imageCopy, to_string(i), cv::Point(1800, 50*(i+2)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(0, 0, 255), 2);
         }  
     }
+    
+    //Indicating to the server that we are done detecting, the informations can be used
+    Detecting = false;
+    
 }
+
+
+
 
 
 //Launch Crow WebServer asynchronously (if not offline testing)
@@ -599,12 +690,19 @@ void Launch_Crow_WebServer(){
     std::cout << std::system("pwd") << std::endl;//Check the directory of the executable (from linux command "pwd")
     
     //define your endpoint at the root directory
-    CROW_ROUTE(app, "/test").methods(/*crow::HTTPMethod::POST,*/ crow::HTTPMethod::GET)([](const crow::request& req){ // 
+    CROW_ROUTE(app, "/test")([]{ // 
 
-        crow::mustache::context ctx;
+        //crow::mustache::context ctx;
         
-        auto page = crow::mustache::load("view-stream.html").render(); //html page
-        
+        auto page = crow::mustache::load_text("view-stream.html"); //html page
+    
+        return page; 
+    });
+    
+    
+    //Route for handling requests and responses between client and server
+    CROW_ROUTE(app, "/DataEx").methods(/*crow::HTTPMethod::POST,*/ crow::HTTPMethod::GET)([](const crow::request& req){ 
+    
         std::string var = req.raw_url;
         std::string Body = req.body;
         cout << "Raw url received: " <<  var << endl;
@@ -628,7 +726,7 @@ void Launch_Crow_WebServer(){
             }
         }
         
-        //Checking if we changed the exposure time
+        //Checking if we changed the Exposure time, Gain or Threshold through the slider
         if(req.url_params.get("Exposure_Time") != nullptr )
         {
             ExposureTime = std::stof(req.url_params.get("Exposure_Time"));
@@ -640,6 +738,117 @@ void Launch_Crow_WebServer(){
         if(req.url_params.get("Threshold") != nullptr )
         {
             Threshold = std::stof(req.url_params.get("Threshold"));
+        }
+        
+        //Checking if we want to register a point
+        if(req.url_params.get("RegPoint") != nullptr)
+        {
+            Register_P = true;
+            
+            //While the point hasnt been registered, wait
+            while(Register_P);
+            
+            //Save Relative coordinates and id of the last registered point as a json string, in order to send it to the client
+             crow::json::wvalue last_point({
+             {"id", registeredPoints.size()}, 
+             {"action", "addition"},
+             {"coordinates", crow::json::wvalue::list( { (double)std::get<1>(registeredPoints.back()).at<float>(0, 0) * 100, (double)std::get<1>(registeredPoints.back()).at<float>(1, 0) * 100, (double)std::get<1>(registeredPoints.back()).at<float>(2, 0) * 100 } )  }
+             });
+             
+             //crow::json::wvalue last_point( crow::json::wvalue::list( { std::get<1>(registeredPoints.back()).at<float>(0, 0) * 100, std::get<1>(registeredPoints.back()).at<float>(1, 0) * 100, std::get<1>(registeredPoints.back()).at<float>(2, 0) * 100 } ) );
+            //Send response
+            return crow::response( last_point );
+            
+        }
+        //Checking if we want to register an error margin
+        if(req.url_params.get("RegErrMargin") != nullptr)
+        {
+            Register_M = true;
+            
+            //While the err margin hasnt been registered, wait
+            while(Register_M);
+            
+            //Save error margin and id of the last registered point as a json string, in order to send it to the client
+             crow::json::wvalue last_point_err({
+             {"id", registeredPoints.size()}, 
+             {"action", "addition err"},
+             {"errorMargin", (double)std::get<2>(registeredPoints.back()) * 100}
+             });
+             
+            //Send response
+            return crow::response( last_point_err );
+             
+        }
+        
+        //Checking if we want to remove the last saved point
+        if(req.url_params.get("RemoveLastP") != nullptr)
+        {
+            RemoveLastRegistered = true;
+            
+            //While the point hasnt been erased, wait
+            while(RemoveLastRegistered);
+            
+            //Send the size +1 to the client for him to know which point to remove
+            crow::json::wvalue last_point({
+            {"id",registeredPoints.size() + 1},
+            {"action", "deletion"}
+            });
+            //Send response
+            return crow::response( last_point );
+        } 
+        
+        
+        
+        //Checking if we want to register a point or an axis for the relative basis
+        if(req.url_params.get("RegOrigin") != nullptr)
+        {
+            RegOrigin = true;
+            
+            //While the origin hasnt been registered, wait
+            while(RegOrigin);
+            
+            //Send response to client, for him to know which point has been registered
+            return crow::response( to_string(planePoints.size()) );
+        }
+        if(req.url_params.get("RegXAxis") != nullptr)
+        {
+            RegXAxis = true;
+            
+            //While the X axis hasnt been registered, wait
+            while(RegXAxis);
+            
+            //Send response to client, for him to know which point has been registered
+            return crow::response( to_string(planePoints.size()) );
+        }
+        if(req.url_params.get("RegYAxis") != nullptr)
+        {
+            RegYAxis = true;
+            
+            //While the Y axis hasnt been registered, wait
+            while(RegYAxis);
+            
+            //Send response to client, for him to know which point has been registered
+            return crow::response( to_string(planePoints.size()) );
+        }
+        
+        //Check if we are detecting a point in detection mode (checking continuously, each 3000ms for example)
+        if(req.url_params.get("Detected") != nullptr)
+        {
+            Detecting = true;
+            
+            cout << "while loop" << endl;
+            //Wait for the Detection to be finished
+            while(Detecting);
+            
+            cout << "Creating var" << endl;
+            crow::json::wvalue last_point({
+            {"id",Point_Detected},
+            {"action", "CheckDetect"}
+            });
+            
+            cout << "sending response" << endl;
+             //Send response to client, for him to know which point has been detected
+            return crow::response( last_point );
         }
         /*
         //cout << Body.find("output") << "   " << Body.find("Real") << "   " << Body.find("Bin") << endl;
@@ -669,8 +878,26 @@ void Launch_Crow_WebServer(){
         } */
        // crow::mustache::context ctx ({{"person", name}}); // 
 
-        return page; 
+        return crow::response(200);
     });
+    
+    
+    /*//Route for responses (from server to client) to send infos about the basis
+    CROW_ROUTE(app, "/Resp/BasisInfo")
+    ([](crow::response& res) {
+        cout << "Hi" << endl;
+        //Send the number of registered point for the relative basis to the client
+        res.write( to_string(planePoints.size()) );
+        //res.write( to_string(img_count) );
+        res.end();
+    });
+    
+    //Route for responses (from server to client) to send the coordinates of each registered point
+    CROW_ROUTE(app, "/Resp/Table")
+    ([](crow::response& res) {
+        cout << "Hi" << endl;
+        res.end();
+    });*/
     
     //set the port, set the app to run asynchronously (value is stored in a variable because for some reason it doesn't run asynchronously otherwise)
     std::future< void > runner = app.port(18080).run_async();
@@ -765,6 +992,165 @@ void Launch_Crow_WebServer(){
 /*                                            */
 /**********************************************/
 
+
+/*
+int main(int argc, char* argv[])
+{  
+    aruco::MarkerMap* mmap = new aruco::MarkerMap; //Tool (main) MarkerMap
+    aruco::MarkerMap* mmRelative = new aruco::MarkerMap; //Relative MarkerMap
+    
+    ParseConfig(argv[1], mmap, mmRelative);
+    
+    //raw frame
+      
+        
+//Use opengl and cuda for speedup
+#if defined(ENABLE_GL_DISPLAY) && defined(ENABLE_GPU_UPLOAD)
+    std::cout << "Using CUDA\n";
+    cv::cuda::GpuMat gpu_frame;
+#else
+    std::cout << "Not using CUDA\n";
+#endif
+
+//Creation of images to display
+#ifdef ENABLE_GL_DISPLAY
+    std::cout << "Using openGL\n";
+    cv::namedWindow("Tool", cv::WINDOW_OPENGL);
+    //cv::namedWindow("Thresh", cv::WINDOW_OPENGL);
+#else
+    std::cout << "Not using openGL\n";
+    cv::namedWindow("Tool", cv::WINDOW_NORMAL);
+    //cv::namedWindow("Thresh", cv::WINDOW_NORMAL);
+#endif  
+
+    //Startup and start image acquisition
+    if(VmbErrorSuccess != Open_and_Start_Acquisition() ){
+        //throw Cam_Exception("Openning / Start Acquisition error !");
+        cout << "Openning / Start Acquisition error !" << endl;
+        return -1;
+    }
+
+    namedWindow("Tool", cv::WINDOW_NORMAL);
+    
+    cv::resizeWindow("Tool", 1920, 1080);
+
+
+    //empty img used for displaying the trackbar
+    cv::Mat TrackbarImg = cv::Mat::zeros(1, 500, CV_8UC1);
+
+
+    //Set dictionary and detection mode
+    //MDetector.setDictionary("ARUCO_MIP_16h3");
+    MDetector.setDetectionMode(aruco::DM_FAST);
+    
+    
+    //Changing manually the parameters of the detector
+    aruco::MarkerDetector::Params &params= MDetector.getParameters();
+    
+    params.cornerRefinementM = aruco::CORNER_LINES; //Corner refinement method
+    params.maxThreads = -1; //Max threads used in parallel
+    params.lowResMarkerSize = 5; //minimum size of a marker in the low resolution image
+    params.NAttemptsAutoThresFix = 1; //number of times that tries a random threshold in case of THRES_AUTO_FIXED
+    params.error_correction_rate = 1; 
+    
+    cv::namedWindow("Trackbars", cv::WINDOW_GUI_EXPANDED);
+        
+    //
+    
+    //cv::resizeWindow("Trackbars", 100, 100);
+    cv::moveWindow("Trackbars",0,750);
+    //Creating trackbars
+    cv::createTrackbar("Calibration Z offset", "Trackbars", NULL, 2000);
+    //cv::createTrackbar("Track 2", "Trackbars", NULL, 2000);
+    
+    cv::setTrackbarPos("Calibration Z offset", "Trackbars", zOffset);
+
+
+    //Start calibration right away if we are in dynamic mode
+    if(!IsStatic)
+        Calib_points = true;
+        
+            
+    int Current_Image = 0;
+    
+    int key = 0;
+    cv::TickMeter tm_full, tm_comp1, tm_comp2, tm_resize3, tm_detect, tm_end;
+    
+    while(key != 27){
+        
+        tm_full.start();
+        tm_comp1.start(); 
+        key = cv::waitKey(1) & 0xFF; 
+        
+        
+        //If this image has already been processed, skip it
+        if(Current_Image == img_count){
+            continue;
+        }
+        Current_Image = img_count;
+        
+        //NEW CAMERA
+        if(ptr_raw_frame == NULL){//Check if we started receiving
+            continue;
+        }
+
+        raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?)      
+        
+        //resize down for printing the image
+        cv::Mat resized_down = cv::Mat(1080, 1920, CV_8UC1);
+        cv::resize(raw_frame, resized_down, resized_down.size(), 0, 0, cv::INTER_NEAREST);
+        
+        // creating color image for printing colored features on the image, and for better marker detection (because needs color image for input)
+        cv::Mat img_color = cv::Mat(1080, 1920, CV_8UC3);
+        cv::cvtColor(resized_down, img_color, cv::COLOR_GRAY2BGR ); 
+       tm_comp1.stop();
+        
+        //Detect markers
+        tm_detect.start();
+        vector<aruco::Marker> detected_markers = MDetector.detect(img_color);
+        tm_detect.stop();
+        
+        tm_comp2.start();
+        //draw Markers
+        for (auto m: detected_markers)
+            m.draw(img_color, Scalar(0, 0, 255), 1);
+
+            
+        // draw help
+        cv::putText(img_color, "'a' add current image for calibration", cv::Point(10,40), FONT_HERSHEY_SIMPLEX, 1 * 1920 / 1920., cv::Scalar(125,255,255), 2);
+        cv::putText(img_color, "'esc' save and quit", cv::Point(10,80), FONT_HERSHEY_SIMPLEX, 1 * 1920 / 1920., cv::Scalar(125,255,255), 2);
+
+#if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
+        gpu_frame.upload(img_color);//resized_down
+        cv::imshow("Tool", gpu_frame);
+#else
+        cv::imshow("Tool", img_color);//resized_down
+#endif
+        
+        tm_comp2.stop();    
+        tm_full.stop();
+    }   
+        
+    cv::destroyAllWindows();
+    
+    if(VmbErrorSuccess != Stop_Acquisition_and_Close() ){
+        //throw Cam_Exception("Closing / Stop Acquisition error !");
+        cout << "Closing / Stop Acquisition error !" << endl;
+        return -1;
+    }
+    
+    cout << "Average comp 1 time: " << tm_comp1.getAvgTimeSec()*1000 << " ms" << endl;
+    cout << "Average detection time: " << tm_detect.getAvgTimeSec()*1000 << " ms" << endl;
+    cout << "Average comp 2 time: " << tm_comp2.getAvgTimeSec()*1000 << " ms" << endl;
+    cout << "Average full computation time: " << tm_full.getAvgTimeSec()*1000 << " ms" << endl;
+        
+    return 0;   
+}*/
+
+
+
+
+
 int main(int argc, char** argv)
 {
     //try
@@ -804,19 +1190,7 @@ int main(int argc, char** argv)
             exit(1); // or error handling
         }
 #endif      
-        
-        //Image that gets data from the frame pointer
-#ifdef OLD_CAMERA
-        //OLD CAMERA
-        cv::Mat yuyv_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC2);
-        //Original image, that gets the cam frame from the pointer
-        cv::Mat originalImage = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
-        //copied image, for printing the markers on the screen
-        cv::Mat imageCopy;
-#else
-        //NEW CAMERA
-        cv::Mat raw_frame = cv::Mat(imgSizeY, imgSizeX, CV_8UC1);   
-#endif        
+
         
         //empty img used for displaying the trackbar
         cv::Mat TrackbarImg = cv::Mat::zeros(1, 500, CV_8UC1);
@@ -920,8 +1294,7 @@ int main(int argc, char** argv)
         }
 #endif        
 
-        
-        //Launch_Crow_WebServer(); //Launch Webserver asynchronously
+        int Current_Image = 0;
         
         /////Timers
         cv::TickMeter tm_full, tm_image, tm_copy, tm_detect, tm_comp1, tm_comp2, tm_comp3;
@@ -965,7 +1338,14 @@ int main(int argc, char** argv)
 #else           
             
             //NEW CAMERA
+            tm_copy.start();
             
+            //If this image has already been processed, skip it
+            if(Current_Image == img_count){
+                continue;
+            }
+            Current_Image = img_count;
+        
             //Changing features updated through webserver (if needed)
             VmbErrorType err = cameras[0]->GetFeatureByName ( "Gain", pFeature );
             err = pFeature -> SetValue(Gain);
@@ -981,13 +1361,16 @@ int main(int argc, char** argv)
                 cout << "Could not set exposure time" << endl;
                 return err;
             }
-    
             
             if(ptr_raw_frame == NULL){//Check if we started receiving
                 continue;
             }
              
-            raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?)           
+            raw_frame.data = ptr_raw_frame; //Getting raw frame (of the current image ?) 
+            //originalImage = raw_frame.clone(); //Copying image to free the image pointer
+            
+            //DEALLOCATE FRAME POINTER MEMORY AFTER COPYING THE IMAGE
+            //delete ptr_raw_frame;          
 #endif            
             
             //Setting up threshold, if changed through webserver, before detection
@@ -1003,7 +1386,6 @@ int main(int argc, char** argv)
             tm_copy.stop();
 #else            
             //NEW CAMERA
-            tm_copy.start();
             
             // First resizing image to HD
             cv::Mat imgtmp = cv::Mat(1080, 1920, CV_8UC3);
@@ -1011,12 +1393,12 @@ int main(int argc, char** argv)
             cv::resize(raw_frame, imgtmp, imgtmp.size(), 0, 0, cv::INTER_NEAREST);
             
             //Copy image to the right format
-            cv::Mat imageCopy = cv::Mat(imgSizeY, imgSizeX, CV_8UC3);
+            cv::Mat imageCopy = cv::Mat(1080, 1920, CV_8UC3);
             
             cv::cvtColor(imgtmp, imageCopy, cv::COLOR_GRAY2BGR ); // for printing colored features on the image, and for better marker detection (because needs color image for input)
             tm_copy.stop();
 #endif
-
+            
             tm_detect.start();
             //detecting markers
             vector<aruco::Marker> markers=MDetector.detect(imageCopy,camParameters,0.02);
@@ -1026,8 +1408,7 @@ int main(int argc, char** argv)
             //get thresholded image
             cv::Mat imageBin = MDetector.getThresholdedImage();
             cv::cvtColor(imageBin, imageBin, cv::COLOR_GRAY2BGR ); // for sending the image
-           /* string ty =  type2str( imageBin.type() );
-            printf("Matrix: %s %dx%d \n", ty.c_str(), imageBin.cols, imageBin.rows );*/
+            
 
 
             tm_detect.stop();
@@ -1134,7 +1515,7 @@ int main(int argc, char** argv)
 
                     Rel_objectPoint.at<float>(0, 0) = Relative_coordinates.at<float>(0, 0);
                     Rel_objectPoint.at<float>(0, 1) = Relative_coordinates.at<float>(1, 0);
-                    Rel_objectPoint.at<float>(0, 2) = Relative_coordinates.at<float>(2, 0);/**/
+                    Rel_objectPoint.at<float>(0, 2) = Relative_coordinates.at<float>(2, 0);
                     
                     cv::projectPoints(Rel_objectPoint, relativeRvec, relativeTvec, camParameters.CameraMatrix, camParameters.Distorsion, ImagePoint); //Project the 3d points in 2d
                     cv::drawMarker(imageCopy, ImagePoint.at(0), cv::Scalar(0, 120, 255), cv::MARKER_TILTED_CROSS, 20, 2 ); //Draw cross for the tool tip on each frame
@@ -1147,7 +1528,7 @@ int main(int argc, char** argv)
                     
                     Rel_objectPoint.at<float>(0, 0) = Relative_coordinates.at<float>(0, 0);
                     Rel_objectPoint.at<float>(0, 1) = Relative_coordinates.at<float>(1, 0);
-                    Rel_objectPoint.at<float>(0, 2) = Relative_coordinates.at<float>(2, 0);/**/
+                    Rel_objectPoint.at<float>(0, 2) = Relative_coordinates.at<float>(2, 0);
                     
                     cv::projectPoints(Rel_objectPoint, MMRelativeTracker.getRvec(), MMRelativeTracker.getTvec(), camParameters.CameraMatrix, camParameters.Distorsion, ImagePoint); //Project the 3d points in 2d
                     cv::drawMarker(imageCopy, ImagePoint.at(0), cv::Scalar(0, 120, 255), cv::MARKER_TILTED_CROSS, 20, 2 ); //Draw cross for the tool tip on each frame
@@ -1158,14 +1539,14 @@ int main(int argc, char** argv)
                     cv::drawMarker(imageCopy, ImagePoint.at(0), cv::Scalar(0, 120, 255), cv::MARKER_TILTED_CROSS, 20, 2 ); //Draw cross for the tool tip on each frame
                 }
                 
-                /*cout << "RT1 : " << MMTracker.getRTMatrix() << endl;
-                cout << "in : " << objectPoint_41 << endl;
-                cout << "out : " << Real_coordinates << endl << endl;
+                //cout << "RT1 : " << MMTracker.getRTMatrix() << endl;
+                //cout << "in : " << objectPoint_41 << endl;
+                //cout << "out : " << Real_coordinates << endl << endl;
                 
-                cout << "RTbase : " << relativeRTmat << endl;
+                //cout << "RTbase : " << relativeRTmat << endl;
                 
-                cout << "in : " << Real_coordinates << endl;
-                cout << "out : " << Relative_coordinates << endl << endl;*/
+                //cout << "in : " << Real_coordinates << endl;
+                //cout << "out : " << Relative_coordinates << endl << endl;
                 
                 
                 if(Calib_points){
@@ -1185,7 +1566,7 @@ int main(int argc, char** argv)
             tm_comp2.stop();
             
             
-            tm_comp3.start();
+           
             /////////////////IF THE ORIGIN IS NOT SET (and we want static positionning), SET IT ////////////////////////
             if(!IsStaticSet && IsStatic)
             {
@@ -1196,6 +1577,15 @@ int main(int argc, char** argv)
             if(IsStaticSet && IsStatic)
                 
                 aruco::CvDrawingUtils::draw3dAxis(imageCopy, camParameters, relativeRvec, relativeTvec, 0.07, 2);
+            
+            
+            ////////////DETECT POINTS (At any time)
+            cv::putText(imageCopy, "Detected Points", cv::Point(1800, 50), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 255), 2);
+            if(OneMarkerValid)
+            {
+                Detection_Points(imageCopy);
+            }
+                    
                     
             /////////////////IF THE ORIGIN IS SET (OR WE DONT WANT STATIC POSITIONNING), DO THE CALIBRATION / DETECTION ///////////////////
             if(IsStaticSet || !IsStatic)
@@ -1203,20 +1593,20 @@ int main(int argc, char** argv)
                 
                 ///////CHANGE MODE IF THE ORIGIN WAS SET
                 
-                if(key == 'd' | key == 'D')
+                /*if(key == 'd' | key == 'D')
                 {
                     if(Calib_points){
                         Detect_points = true;
                         Calib_points = false;
                     }
-                }
+                }*/
                 
                 if(key == 'c' | key == 'C')
                 {
-                    if(Detect_points){
+                    //if(Detect_points){
                         Calib_points = true;
-                        Detect_points = false;
-                    }
+                    //    Detect_points = false;
+                    //}
                 }
                   
                 //////IF WE ARE IN CALIBRATION MODE
@@ -1230,18 +1620,18 @@ int main(int argc, char** argv)
                         Calibration_Points(key, imageCopy);
                         
                         //Drawing the moving error circle of the current point
-                        if(RpressedOnce)
+                        if(RegisterErrMargin)
                         {
                             //For having a 3 channels Mat (instead of 4)
-                            /*cv::Mat coordinates = cv::Mat(3, 1, CV_32FC1);
-                            coordinates.at<float>(0, 0) = Real_coordinates.at<float>(0, 0);
-                            coordinates.at<float>(1, 0) = Real_coordinates.at<float>(1, 0);
-                            coordinates.at<float>(2, 0) = Real_coordinates.at<float>(2, 0);*/
+                            //cv::Mat coordinates = cv::Mat(3, 1, CV_32FC1);
+                            //coordinates.at<float>(0, 0) = Real_coordinates.at<float>(0, 0);
+                            //coordinates.at<float>(1, 0) = Real_coordinates.at<float>(1, 0);
+                            //coordinates.at<float>(2, 0) = Real_coordinates.at<float>(2, 0);
 
-                            /*cv::Mat Curr_Rel_coordinates = cv::Mat(3, 1, CV_32FC1);
-                            Curr_Rel_coordinates.at<float>(0, 0) = Relative_coordinates.at<float>(0, 0);
-                            Curr_Rel_coordinates.at<float>(1, 0) = Relative_coordinates.at<float>(1, 0);
-                            Curr_Rel_coordinates.at<float>(2, 0) = Relative_coordinates.at<float>(2, 0);*/
+                            //cv::Mat Curr_Rel_coordinates = cv::Mat(3, 1, CV_32FC1);
+                            //Curr_Rel_coordinates.at<float>(0, 0) = Relative_coordinates.at<float>(0, 0);
+                            //Curr_Rel_coordinates.at<float>(1, 0) = Relative_coordinates.at<float>(1, 0);
+                            //Curr_Rel_coordinates.at<float>(2, 0) = Relative_coordinates.at<float>(2, 0);
             
             
                             //Variables for finding the 2D radius
@@ -1263,15 +1653,11 @@ int main(int argc, char** argv)
                     }
                 }
                 
-                /////////////IF WE ARE IN DETECTION MODE
-                if(Detect_points)
-                {
-                    cv::putText(imageCopy, "Detection Mode", cv::Point(5, 50), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 255), 2);
-                    if(OneMarkerValid)
-                    {
-                        Detection_Points(imageCopy);
-                    }
-                }
+                ///////////// DETECT POINTS
+                //if(Detect_points)
+               //{
+                    
+               // }
                 
                 
                 
@@ -1283,11 +1669,11 @@ int main(int argc, char** argv)
                 {
                     for (int i=0; i < registeredPoints.size(); i++){
 
-                        /*cv::Mat rvec, tvec;
-                    rvec.create(3, 1, CV_32F);
-                    rvec = cv::Mat::zeros(3, 1, CV_32F);
-                    tvec.create(3, 1, CV_32F);
-                    tvec = cv::Mat::zeros(3, 1, CV_32F);*/
+                        //cv::Mat rvec, tvec;
+                        //rvec.create(3, 1, CV_32F);
+                        //rvec = cv::Mat::zeros(3, 1, CV_32F);
+                        //tvec.create(3, 1, CV_32F);
+                        //tvec = cv::Mat::zeros(3, 1, CV_32F);
                     
                          //Project point from RELATIVE COORDINATES (so that it can follow the moving basis)
                         vector <cv::Point2f> imagePoint;
@@ -1303,9 +1689,9 @@ int main(int argc, char** argv)
                         
                         
                         //Write coordinates on the image (in the relative basis) if not detection mode
-                        if(!Detect_points && OneMarkerValid){
-                            //string Rel_coordinates = "P" + to_string(i+1) + " : ( " + to_string( (std::get<1>(registeredPoints.at(i))).at<float>(0, 0) *100) + "; " + to_string( (std::get<1>(registeredPoints.at(i))).at<float>(1, 0) *100) + "; " + to_string( (std::get<1>(registeredPoints.at(i))).at<float>(2, 0) *100) + " )" ;
-                            //cv::putText(imageCopy, Rel_coordinates, cv::Point(5, 50*(i+4)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 0), 2);
+                        if(/*!Detect_points && */OneMarkerValid){
+                            string Rel_coordinates = "P" + to_string(i+1) + " : ( " + to_string( (std::get<1>(registeredPoints.at(i))).at<float>(0, 0) *100) + "; " + to_string( (std::get<1>(registeredPoints.at(i))).at<float>(1, 0) *100) + "; " + to_string( (std::get<1>(registeredPoints.at(i))).at<float>(2, 0) *100) + " )" ;
+                            cv::putText(imageCopy, Rel_coordinates, cv::Point(5, 50*(i+4)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 0), 2);
                             
                             
       //////////////////JUST FOR DEBUG (TO DELETE LATER)///////////////////////  
@@ -1321,20 +1707,20 @@ int main(int argc, char** argv)
                             cv::Mat point_tool_coordinates = MMTracker.getRTMatrix().inv() * Real_pt_coord;
             
                             //Write coordinates in the tool basis (for debug)
-                            string str_tool_coordinates = "P" + to_string(i+1) + " : ( " + to_string( point_tool_coordinates.at<float>(0, 0) *100) + "; " + to_string( point_tool_coordinates.at<float>(1, 0) *100) + "; " + to_string( point_tool_coordinates.at<float>(2, 0) *100) + " )" ;
-                            cv::putText(imageCopy, str_tool_coordinates, cv::Point(5, 50*(i+4)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 0), 2);
+                            //string str_tool_coordinates = "P" + to_string(i+1) + " : ( " + to_string( point_tool_coordinates.at<float>(0, 0) *100) + "; " + to_string( point_tool_coordinates.at<float>(1, 0) *100) + "; " + to_string( point_tool_coordinates.at<float>(2, 0) *100) + " )" ;
+                            //cv::putText(imageCopy, str_tool_coordinates, cv::Point(5, 50*(i+4)), cv::FONT_HERSHEY_SIMPLEX, 1 * imgSizeX / 1920, cv::Scalar(255, 0, 0), 2);
                         }
                     }
-                }/**/          
-            }            
+                }          
+            }        
             cpt++;
 
 #ifdef OFFLINE_TEST //If we are testing offline
       
-           /* cv::Mat imgPrint = cv::Mat(1080, 1920, CV_8UC3);
+           // cv::Mat imgPrint = cv::Mat(1080, 1920, CV_8UC3);
 
-            cv::resize(imageCopy, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);*/
-            
+           // cv::resize(imageCopy, imgPrint, imgPrint.size(), 0, 0, cv::INTER_NEAREST);
+             tm_comp3.start();
     #if (defined ENABLE_GL_DISPLAY) && (defined ENABLE_GPU_UPLOAD)
                 gpu_frame.upload(imageCopy);//resized_down
                 cv::imshow("Tool", gpu_frame);
@@ -1367,19 +1753,29 @@ int main(int argc, char** argv)
                 //then hand image to websocket by Gstreamer 
                 writer.write(imgPrint);
             }
-#endif            
-
+#endif         
+            
             tm_comp3.stop();
             
             tm_full.stop();
             
-        } //END WHILE LOOP
+        } 
+        
+        /////////////END WHILE LOOP//////////////
 
 #ifdef OLD_CAMERA             
         // exiting program
         if (helper_deinit_cam() < 0)
             fprintf(stderr, "Failed to deinitialise camera : %m\n");
-#endif      
+#else            
+        //NEW CAMERA
+        //Stop image acquisition and shutdown camera and API
+        if(VmbErrorSuccess != Stop_Acquisition_and_Close() ){
+            //throw Cam_Exception("Closing / Stop Acquisition error !");
+            cout << "Closing / Stop Acquisition error !" << endl;
+            return -1;
+        }
+#endif       
 
 #ifndef OFFLINE_TEST
         exiting = true; //Indicate that we have to stop the image getter thread
@@ -1396,24 +1792,6 @@ int main(int argc, char** argv)
         delete mmap; //delete the mmap pointer 
         delete mmRelative; //delete the mmRelative pointer 
 
-#ifndef OLD_CAMERA             
-        //NEW CAMERA
-        //Stop image acquisition and shutdown camera and API
-        if(VmbErrorSuccess != Stop_Acquisition_and_Close() ){
-            //throw Cam_Exception("Closing / Stop Acquisition error !");/**/
-            cout << "Closing / Stop Acquisition error !" << endl;
-            return -1;
-        }
-#endif            
-       // cout << "Average image catch time : " << timerImg.getAvrg() * 1000 << " ms" << endl;
-        //cout << "Average image catch time (timer 2): " << (float)sum/cpt << " ms" << endl;
-        //std::cout << "Average image catch time : "<< timerGetImage.getAvrg() * 1000 << " ms " << endl;
-        //cout << "Average computation time : " << timerComputation.getAvrg() * 1000 << " ms"<< endl;
-        //cout << "Average total time : " << timerFull.getAvrg() * 1000 << " ms" << endl;
-        //cout << "Real average FPS : "<< 1./timerFull.getAvrg() << " fps" << endl;
-        
-        //std::cout << "Average image catch time (timer 2): " << (sum_img/cpt) * 1000 << " ms  /!\\ keep in mind this is done in a separate thread" << std::endl;
-        //cout << "Average base FPS (timer 2) : "<< cpt/sum_img << " fps" << endl << endl;
         
 
 #ifdef OLD_CAMERA                    
@@ -1431,14 +1809,14 @@ int main(int argc, char** argv)
         
         cout << "MArker catch frequency : " << (float)Mdetected*100/cpt << " % of the time." << endl;
         
-        //USING EXIT BECAUSE RETURN 0 DOESNT STOP PROGRAMME ....
-        //exit(1);
-    /*}
-    catch(std::exception& ex)
-    {
-        cout << "Exception : " << ex.what() << "\n";
-    }*/
+    //}
+    //catch(std::exception& ex)
+    //{
+    //    cout << "Exception : " << ex.what() << "\n";
+    //}
        
     return 0;
     
 }
+
+

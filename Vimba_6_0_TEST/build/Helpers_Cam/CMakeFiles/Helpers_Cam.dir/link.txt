@@ -1,0 +1,2 @@
+/usr/bin/ar qc libHelpers_Cam.a  CMakeFiles/Helpers_Cam.dir/src/ApiController.cpp.o CMakeFiles/Helpers_Cam.dir/src/CameraObserver.cpp.o CMakeFiles/Helpers_Cam.dir/src/FrameObserver.cpp.o CMakeFiles/Helpers_Cam.dir/Helpers_Cam_autogen/mocs_compilation.cpp.o
+/usr/bin/ranlib libHelpers_Cam.a

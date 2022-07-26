@@ -11,7 +11,7 @@
 #ifndef V4L2_HELPER_H
 #define V4L2_HELPER_H
 
-#define GET 1
+//#define GET 1
 #define SET 2
 #include <linux/videodev2.h>
 

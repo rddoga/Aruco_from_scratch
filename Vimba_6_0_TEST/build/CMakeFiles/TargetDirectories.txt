@@ -1,0 +1,4 @@
+/home/rddoga/Desktop/Vimba_6_0_TEST/build/CMakeFiles/NewCam.dir
+/home/rddoga/Desktop/Vimba_6_0_TEST/build/CMakeFiles/edit_cache.dir
+/home/rddoga/Desktop/Vimba_6_0_TEST/build/CMakeFiles/rebuild_cache.dir
+/home/rddoga/Desktop/Vimba_6_0_TEST/build/CMakeFiles/NewCam_autogen.dir

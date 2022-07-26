@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+  <meta charset="UTF-8"></meta>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"></meta>
+  
+  <title>JSMpeg Stream Client</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/picnic"> </link>
+
+</head>
+<body>
+  
+
+<div class="tabs three">
+  <input id='tab-1' type='radio' name='tabgroupB' checked="checked" />
+  <label class="pseudo button toggle" for="tab-1">Video Stream</label>
+  <input id='tab-2' type='radio' name='tabgroupB' />
+  <label class="pseudo button toggle" for="tab-2">Points</label>
+  <input id='tab-3' type='radio' name='tabgroupB' />
+  <label class="pseudo button toggle" for="tab-3">Shigg</label>
+  <div class="row">
+<!--First Tab for Video Streaming-->
+    <div>
+        <h1>Video Streaming with GStreamer and WebSocket</h1>
+        
+        <canvas id="video-canvas" width="640" height="480" style="float:left; border:2px solid green"></canvas>
+      
+      <!--
+      <form action="/test" method="get" >
+        <input type="radio" id="Real Image" name="output" value="Real">
+        <label for="Real Image">Real Image</label><br>
+        <input type="radio" id="Binary Image" name="output" value="Bin">
+        <label for="Binary Image">Binary Image</label><br>
+        <input type="submit" value="Submit">
+      </form>
+      -->
+      
+        <input type="radio" id="Real Image" name="output" value="Real" checked="checked" />
+        <label for="Real Image" class="checkable">Real Image</label><br />
+        <input type="radio" id="Binary Image" name="output" value="Bin" />
+        <label for="Binary Image" class="checkable">Binary Image</label><br />
+        <input type="radio" id="No Image" name="output" value="Inactive" />
+        <label for="No Image" class="checkable">No Video</label><br />
+        <button onclick="sendDataRadio()">Change View</button>
+        
+        
+        <br /><br />    
+        <button>Button</button>
+        <button class='success'>Success</button>
+        <button class='warning'>Warning</button>
+        <button class='error'>Error</button>
+        <button disabled="disabled">Disabled</button><br />
+        <p id="test"> R </p>
+
+        
+        <input type="range" id="ExposureTime" name="Exposure_Time" min="1000" max="15000" step="1000" onchange="updateSlider(this.value, this.name)" />
+        <div id="SliderChange"> Exposure Time </div>
+        <br />
+        <input type="range" id="Gain" name="Gain" min="0" max="27" step="1" onchange="updateSlider(this.value, this.name)" />
+        <div id="SliderChange"> Gain </div>
+        <br />
+        <input type="range" id="Thresh" name="Threshold" min="0" max="255" step="1" onchange="updateSlider(this.value, this.name)" />
+        <div id="SliderChange"> Threshold </div>
+
+    </div>
+
+<!--Second tab for Point registration/detection -->
+    <div>
+    
+      <div class="flex two demo" style="padding:20px">
+        <div>
+          <article class="card" > 
+            <header> ACTIONS </header> 
+            
+            <section style="padding-left:20px">
+            
+              <button id="Origin" class='success' onclick="sendDataBasis('RegOrigin')">Register Origin</button>
+              <button id="XAxis" class='success' onclick="sendDataBasis('RegXAxis')">Place X axis</button>
+              <button id="YAxis" class='success' onclick="sendDataBasis('RegYAxis')">Place Y axis</button><br />
+            
+              <div class="flex two demo" >
+                <div>
+                  <button onclick="sendData('RegPoint')">Register Point</button>
+                
+                  <button class='warning' onclick="sendData('RegErrMargin')">Register error margin</button>
+                </div>
+                <div align="right"><button class='error' onclick="sendData('RemoveLastP')">Remove last registered</button></div>
+                
+              </div>
+            
+            </section>
+            
+          </article>
+        </div>
+        <div>
+          <article class="card" > 
+            <header> REGISTERED POINTS </header>   
+                <table class="primary">
+                  <thead>
+                    <tr>
+                      <th>Point ID</th>
+                      <th>Coordinates</th>
+                      <th>Error Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr id="P1" hidden="hidden">
+                      <td>1</td>
+                      <td id="coord1">Paris, Fr </td>
+                      <td id="error1">[ErrM]</td>
+                    </tr>
+                    <tr id="P2" hidden="hidden">
+                      <td>2</td>
+                      <td id="coord2">San Francisco, USA</td>
+                      <td id="error2">[ErrM]</td>
+                    </tr>
+                    <tr id="P3" hidden="hidden">
+                      <td>3</td>
+                      <td id="coord3">New York, USA</td>
+                      <td id="error3">[ErrM]</td>
+                    </tr>
+                    <tr id="P4" hidden="hidden">
+                      <td>4</td>
+                      <td id="coord4">London, UK</td>
+                      <td id="error4">[ErrM]</td>
+                    </tr>
+                    <tr id="P5" hidden="hidden">
+                      <td>5</td>
+                      <td id="coord5">London, UK</td>
+                      <td id="error5">[ErrM]</td>
+                    </tr>
+                  </tbody>
+                </table>
+            <section> </section>
+          </article>
+        </div>
+        <div>
+          <article class="card" > 
+            <header> DETECTED POINT </header>  
+            
+            <section>
+              <strong id="DetectedPoint" style="color:red;font-size:50px;padding:50px;">No Point Detected </strong>
+              
+              <button class="error" onclick="clearInterval(myVar)">Stop detecting</button>
+              
+            </section>
+          </article>
+        </div>
+        <div>
+          <article class="card" > 
+            <header> CARD 4 </header>   
+            <section> </section>
+          </article>
+        </div>
+      </div>
+    </div>
+
+<!-- Third tab for ... -->
+    <div>
+      
+    </div>
+    
+  </div>
+</div>
+
+
+  <!--For displaying the image-->
+  <script type="text/javascript" src="static/jsmpeg.min.js"></script>
+  <script type="text/javascript"> 
+        var canvas = document.getElementById('video-canvas');
+	    var url = 'ws://'+document.location.hostname+':8082/';
+	    var player = new JSMpeg.Player(url, {canvas: canvas});
+	
+    
+  </script>
+
+
+  <!-- Script executed when changing view -->
+  <script>
+function sendDataRadio() {
+  var XHR = new XMLHttpRequest();
+  var urlEncodedData = "";
+  var urlEncodedDataPairs = [];
+  var name;
+
+  var getSelectedValue = document.querySelector('input[name="output"]:checked'); 
+                
+  // Transformez l'objet data en un tableau de paires clé/valeur codées URL.
+  //for(name in data) {
+  urlEncodedDataPairs.push(encodeURIComponent(getSelectedValue.name) + '=' + encodeURIComponent(getSelectedValue.value));
+  //}
+
+  // Combinez les paires en une seule chaîne de caractères et remplacez tous
+  // les espaces codés en % par le caractère'+' ; cela correspond au comportement
+  // des soumissions de formulaires de navigateur.
+  urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+
+
+  /////////////Sending with Get :
+  // Configurez la requête (GET)
+  XHR.open('GET', '/DataEx?' + urlEncodedData);
+  
+  // Finalement, envoyez les données.
+  XHR.send();
+  
+  
+  ////////////Sending with Post :
+  // Configurez la requête (POST)
+  //XHR.open('POST', '/DataEx');
+  // Ajoutez l'en-tête HTTP requise pour requêtes POST de données de formulaire (IF SENDING WITH POST)
+  //XHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  // Finalement, envoyez les données.
+  //XHR.send(urlEncodedData);
+  
+  if(getSelectedValue.value == "Inactive" ){
+    canvas.setAttribute("hidden","hidden");
+  }
+  else{
+    canvas.removeAttribute("hidden");
+  }
+}
+  
+/*function MyFunction(){
+  var getSelectedValue = document.querySelector(   
+                'input[name="output"]:checked');   
+                
+  if(getSelectedValue != null) {
+    document.getElementById("demo").innerHTML = getSelectedValue.value;
+  } 
+  else{
+    alert("Please Select an option"); 
+  }
+      //document.getElementById("disp").innerHTML 
+     //getElementById >> querySelector en terme de vitesse !
+}*/
+
+  </script>
+
+  
+  <!-- Script executed on slider update -->
+  <script> 
+function updateSlider(slideAmount, sliderName) {
+    var XHR = new XMLHttpRequest();
+    var urlEncodedData = "";
+    var urlEncodedDataPairs = [];
+
+                
+    // Transformez l'objet data en un tableau de paires clé/valeur codées URL.
+    //for(name in data) {
+    urlEncodedDataPairs.push(encodeURIComponent(sliderName) + '=' + encodeURIComponent(slideAmount));
+    //}
+
+    // Combinez les paires en une seule chaîne de caractères et remplacez tous
+    // les espaces codés en % par le caractère'+' ; cela correspond au comportement
+    // des soumissions de formulaires de navigateur.
+    urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+
+
+    /////////////Sending with Get :
+    // Configurez la requête (GET)
+    XHR.open('GET', '/DataEx?' + urlEncodedData);
+
+    // Finalement, envoyez les données.
+    XHR.send();
+}
+  </script> 
+  
+  
+<!-- Script executed on Origin/axis registration request  -->
+  <script>
+  
+//Basis Registration and response from the server (for displaying what point of the basis is to be displayed next)
+function sendDataBasis(Step) {
+  var XHR = new XMLHttpRequest();
+  var urlEncodedData = "";
+  var urlEncodedDataPairs = []; 
+                
+  // Créer un tableau de paires clé/valeur codées URL.
+  urlEncodedDataPairs.push(encodeURIComponent(Step) + '=' + encodeURIComponent("true"));
+
+
+  // Combinez les paires en une seule chaîne de caractères et remplacez tous
+  // les espaces codés en % par le caractère'+' ; cela correspond au comportement
+  // des soumissions de formulaires de navigateur.
+  urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+
+  //Function that will catch the response from the server
+  XHR.onreadystatechange = function() {
+    console.log("onreadystatechange - XHR.responseText: " + XHR.responseText);
+    document.getElementById("test").innerHTML = XHR.responseText;
+    
+    //If we just registered the origin, register the X axis (display info in button text)
+    if(XHR.responseText == 1){
+      document.getElementById("Origin").innerHTML = "Done.";
+      document.getElementById("Origin").disabled = true;
+    }
+    //If we just registered the X axis, register the Y axis (display info in button text)
+    else if(XHR.responseText == 2){
+      document.getElementById("XAxis").innerHTML = "Done.";
+      document.getElementById("XAxis").disabled = true;
+    }
+    //If we are finished, disable button
+    else if(XHR.responseText > 2){
+      document.getElementById("YAxis").innerHTML = "Done.";
+      document.getElementById("YAxis").disabled = true;
+    }
+  }
+  
+  /////////////Sending with Get :
+  // Configurez la requête (GET)
+  XHR.open('GET', '/DataEx?' + urlEncodedData);
+  
+  // Finalement, envoyez les données.
+  XHR.send();
+  
+}  
+  
+  </script>  
+
+  
+    
+<!-- Script executed on point registration/error margin registration/relative Basis registration/point deletion request -->  
+  <script>
+function sendData(type) {
+  var XHR = new XMLHttpRequest();
+  var urlEncodedData = "";
+  var urlEncodedDataPairs = []; 
+                
+  // Créer un tableau de paires clé/valeur codées URL.
+  urlEncodedDataPairs.push(encodeURIComponent(type) + '=' + encodeURIComponent("true"));
+
+
+  // Combinez les paires en une seule chaîne de caractères et remplacez tous
+  // les espaces codés en % par le caractère'+' ; cela correspond au comportement
+  // des soumissions de formulaires de navigateur.
+  urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+
+
+  //Function that will catch the response from the server
+  XHR.onreadystatechange = function() {
+    console.log("onreadystatechange - XHR.responseText: " + XHR.response);
+    document.getElementById("test").innerHTML = XHR.response;
+    
+    //Parse the JSON received String to Javascript variables
+   
+    const ResReceived = JSON.parse(XHR.response);
+    console.log("onreadystatechange - ResReceived: " + ResReceived.coordinates);
+    
+    //Checking if we added or deleted a point
+    //Adding point
+    if(ResReceived.action === "addition"){
+      document.getElementById("coord" + ResReceived.id).innerHTML = "[ " + ResReceived.coordinates + " ]";
+      document.getElementById("P" + ResReceived.id).hidden = false;
+    }
+    //Adding error margin
+    else if(ResReceived.action === "addition err"){
+      document.getElementById("error" + ResReceived.id).innerHTML = ResReceived.errorMargin;
+    }
+    
+    //Deleting point
+    else if(ResReceived.action === "deletion"){
+      document.getElementById("coord" + ResReceived.id).innerHTML = "";
+      document.getElementById("error" + ResReceived.id).innerHTML = "";
+      document.getElementById("P" + ResReceived.id).hidden = true;
+    }
+    
+    //Check if we detected a point
+    else if(ResReceived.action === "CheckDetect"){
+    
+      //Print the ID if we are detecting a point
+      if(ResReceived.id > 0){
+        document.getElementById("DetectedPoint").innerHTML = "ID : " + ResReceived.id ;
+        document.getElementById("DetectedPoint").style = "color:green;font-size:50px;padding:50px;";
+      }else{
+        document.getElementById("DetectedPoint").innerHTML = "No point detected." ;
+        document.getElementById("DetectedPoint").style = "color:red;font-size:50px;padding:50px;";
+      }      
+    }
+    
+  }
+  
+  /////////////Sending with Get :
+  // Configurez la requête (GET)
+  XHR.open('GET', '/DataEx?' + urlEncodedData);
+  
+  // Finalement, envoyez les données.
+  XHR.send();
+}  
+
+
+  </script>
+  
+  <script>
+  
+let myVar = setInterval(sendDetectedCheck, 1000);
+  
+function sendDetectedCheck() {
+
+  //const d = new Date();
+  //document.getElementById("test").innerHTML = d.toLocaleTimeString();
+  
+  var XHR = new XMLHttpRequest();
+  var urlEncodedData = "";
+  var urlEncodedDataPairs = []; 
+                
+  // Créer un tableau de paires clé/valeur codées URL.
+  urlEncodedDataPairs.push(encodeURIComponent("Detected") + '=' + encodeURIComponent("true"));
+
+
+  // Combinez les paires en une seule chaîne de caractères et remplacez tous
+  // les espaces codés en % par le caractère'+' ; cela correspond au comportement
+  // des soumissions de formulaires de navigateur.
+  urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+  console.log("oui oui");
+
+  //Function that will catch the response from the server
+  XHR.onreadystatechange = function() {
+    console.log("onreadystatechange - XHR.responseText: " + XHR.response);
+    document.getElementById("test").innerHTML = XHR.response;
+  
+    //Parse the JSON received String to Javascript variables
+   
+    const ResReceived = JSON.parse(XHR.response);
+    //console.log("onreadystatechange - ResReceived: " + ResReceived.coordinates);
+    
+    //Check if we receive the response giving the id
+    if(ResReceived.action === "CheckDetect"){
+      //Print the ID if we are detecting a point
+      if(ResReceived.id > 0){
+        document.getElementById("DetectedPoint").innerHTML = "ID : " + ResReceived.id ;
+        document.getElementById("DetectedPoint").style = "color:green;font-size:50px;padding:50px;";
+      }else{
+        document.getElementById("DetectedPoint").innerHTML = "No point detected." ;
+        document.getElementById("DetectedPoint").style = "color:red;font-size:50px;padding:50px;";
+      }
+    }
+  }
+  
+  /////////////Sending with Get :
+  // Configurez la requête (GET)
+  XHR.open('GET', '/DataEx?' + urlEncodedData);
+  
+  // Finalement, envoyez les données.
+  XHR.send();
+}
+
+  </script>
+  
+<!--  <script>
+    function changeCanvas(){
+      //Clear the canva if we stop displaying the video
+      var c = document.getElementById('video-canvas');
+      var ctx = c.getContext('2d');
+       
+      var getSelectedValue = document.querySelector('input[name="output"]:checked'); 
+  
+      if(getSelectedValue.value == "Inactive" ){
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById("Changed").innerHTML = "Changed";
+      }
+    }
+  </script>-->
+
+
+
+
+</body>
+</html>

@@ -1,16 +1,23 @@
 #include "Alvium_Camera.h"
+
 #include <QTime>
+
 
 using namespace std;
 using namespace AVT::VmbAPI;
 
+//std::mutex mtx;           // mutex for critical section
+//pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 //////////////////Global variables
 //bool StartReceiving = false;
-unsigned char* ptr_raw_frame = NULL; //Pointer that will be catching the frame
+VmbUchar_t* ptr_raw_frame = NULL; //Pointer that will be catching the frame
 int img_count = 0;          //For FPS count
 
-//cout << "Hello" << endl;
+
+
+///////////////////////
+
 VmbErrorType err;
 // Every Vimba function returns an error code that
 // should always be checked for VmbErrorSuccess
@@ -25,7 +32,7 @@ CameraPtrVector cameras ;
 // A list of known cameras
 
 //cout << "creating frame vector" << endl;
-FramePtrVector frames (10); // A list of frames for streaming . We chose
+FramePtrVector frames (6); // A list of frames for streaming . We chose
 // to queue 3 frames .
 
 
@@ -36,8 +43,7 @@ VmbInt64_t nPLS;
 // The payload size of one frame
 
 
-
-/////////////Function for the fps counting class
+/////////////Functions for the fps counting class
 
 //Constructor
 FPSCounter::FPSCounter() : m_IsRunning( false ), m_LastFrameID( 0 ) , m_Valid( false )
@@ -96,13 +102,21 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
             //start = clock();
             
             //cout << "Frame received successfully !!" << endl;
+            //ptr_raw_frame = new VmbUchar_t();
+            //cout << "image before mutex" <<endl;
+            //pthread_mutex_lock(&mutex); //Lock the Resources 
+            
             pFrame->GetImage(ptr_raw_frame); //Getting raw image
+            //cout << "IMAGE" <<endl;
+            //pthread_mutex_unlock(&mutex); //Unlock the resources
+            //cout << "image after mutex" <<endl;
+            //cout << ptr_raw_frame;
             
             unsigned int width, height;
             pFrame->GetHeight(height);
             pFrame->GetWidth(width);
 
-           // cout << width << " x " << height << endl;/**/
+            //cout << width << " x " << height << endl;/**/
             
             img_count++;
             m_FPSReceived.count( img_count );
@@ -112,7 +126,7 @@ void FrameObserver::FrameReceived ( const FramePtr pFrame ) //Method that gets c
     
             if( m_FPSReceived.isValid() )
             {
-                if(img_count%50 == 0)// Printing current fps
+                if(img_count%30 == 0)// Printing current fps
                 {
                     Print_FPS();
                 }
@@ -176,6 +190,9 @@ VmbErrorType Open_and_Start_Acquisition()
         cout << "Not recognizing camera" << endl;
         return err;
     }
+    
+    //Creating the Frame observer pointer with the custom object (and the camera)
+    IFrameObserverPtr pObserver(new FrameObserver (cameras[0]) );    
         
     
     cout << "Getting buffer" << endl;
@@ -191,7 +208,7 @@ VmbErrorType Open_and_Start_Acquisition()
     {
         cout << "Allocating and announcing frames "<< endl;
         ( *iter ). reset( new Frame ( nPLS ) );
-        err = ( *iter )-> RegisterObserver ( IFrameObserverPtr (new FrameObserver ( cameras[0] )) );
+        err = ( *iter )-> RegisterObserver ( pObserver );
         if(err != VmbErrorSuccess)
             return err;
             
@@ -312,13 +329,15 @@ VmbErrorType Open_and_Start_Acquisition()
         return err;
     }
     cout << whatever << endl;*/
-    /*err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
-    err = pFeature -> SetValue("Average"); //Summing values when binning adjacent pixels
+    /**/err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
+    err = pFeature -> SetValue("Average"); //Summing/Averaging values when binning adjacent pixels
     err = pFeature -> IsWritable(writable1);
     
     err = cameras[0]->GetFeatureByName ( "BinningVertical", pFeature );
     err = pFeature -> SetValue(2); //dividing by 2 the original vertical resolution (the horizontal one is then divided automatically)
-    err = pFeature -> IsWritable(writable2);*/
+    err = pFeature -> IsWritable(writable2);
+    cout << writable1 << "\t" << writable2 << endl;
+    
     
     /**/double framerate, min, max;
     err = cameras[0]->GetFeatureByName ( "Gain", pFeature );
@@ -331,7 +350,7 @@ VmbErrorType Open_and_Start_Acquisition()
     }
     
     err = cameras[0]->GetFeatureByName ( "ExposureTime", pFeature );
-    err = pFeature -> SetValue(9000.0f);
+    err = pFeature -> SetValue(6000.0f);
     if(VmbErrorSuccess != err){
         cout << "Could not set exposure time" << endl;
         return err;
@@ -414,6 +433,8 @@ VmbErrorType Stop_Acquisition_and_Close()
     err = cameras[0]-> RevokeAllFrames ();
     if(err != VmbErrorSuccess){
         cout << "Couldnt revoke frames" << endl;
+        cout << err << endl;
+        
         return err;  
     }
         
