@@ -32,7 +32,7 @@ CameraPtrVector cameras ;
 // A list of known cameras
 
 //cout << "creating frame vector" << endl;
-FramePtrVector frames (6); // A list of frames for streaming . We chose
+FramePtrVector frames (5); // A list of frames for streaming . We chose
 // to queue 3 frames .
 
 
@@ -329,17 +329,17 @@ VmbErrorType Open_and_Start_Acquisition()
         return err;
     }
     cout << whatever << endl;*/
-    /**/err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
+    /*err = cameras[0]->GetFeatureByName ( "BinningVerticalMode", pFeature );
     err = pFeature -> SetValue("Average"); //Summing/Averaging values when binning adjacent pixels
     err = pFeature -> IsWritable(writable1);
     
     err = cameras[0]->GetFeatureByName ( "BinningVertical", pFeature );
     err = pFeature -> SetValue(2); //dividing by 2 the original vertical resolution (the horizontal one is then divided automatically)
     err = pFeature -> IsWritable(writable2);
-    cout << writable1 << "\t" << writable2 << endl;
+    cout << writable1 << "\t" << writable2 << endl;*/
     
     
-    /**/double framerate, min, max;
+    /*double framerate, min, max;
     err = cameras[0]->GetFeatureByName ( "Gain", pFeature );
     err = pFeature -> SetValue(20.0f);
     err = pFeature -> GetRange( min, max );
@@ -354,7 +354,7 @@ VmbErrorType Open_and_Start_Acquisition()
     if(VmbErrorSuccess != err){
         cout << "Could not set exposure time" << endl;
         return err;
-    }
+    }*/
     
     
     

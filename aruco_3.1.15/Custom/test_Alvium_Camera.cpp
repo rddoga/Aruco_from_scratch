@@ -38,8 +38,12 @@ int main(int argc, char* argv[])
     }
 
     int key = 0;
+
+    cv::TickMeter tm_full, tm_resize1, tm_resize2, tm_resize3, tm_detect, tm_end;
+
     while(key != 27){
         
+		tm_full.start();
         key = cv::waitKey(1) & 0xFF; 
         
         //NEW CAMERA
@@ -70,6 +74,7 @@ int main(int argc, char* argv[])
         
         cv::imshow("Img", resized_down);
         //cout << "Apres affichage" << endl;
+		tm_full.stop();
     }   
     
     if(VmbErrorSuccess != Stop_Acquisition_and_Close() ){
@@ -77,6 +82,8 @@ int main(int argc, char* argv[])
         cout << "Closing / Stop Acquisition error !" << endl;
         return -1;
     }
+
+	cout << "Average full computation time: " << tm_full.getAvgTimeSec()*1000 << " ms" << endl;
     
     return 0;   
 }

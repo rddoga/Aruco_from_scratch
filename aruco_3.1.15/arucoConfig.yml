@@ -1,8 +1,8 @@
 %YAML:1.0
 ---
-aruco-dictionary: ARUCO_MIP_16h3
+#aruco-dictionary: ARUCO_MIP_16h3 #dictionnary used
 aruco-detectMode: DM_FAST #DM_NORMAL 
-aruco-cornerRefinementM: CORNER_LINES
+aruco-cornerRefinementM: CORNER_LINES 
 aruco-thresMethod: THRES_ADAPTIVE
 aruco-maxThreads: -1
 aruco-borderDistThres: 0
