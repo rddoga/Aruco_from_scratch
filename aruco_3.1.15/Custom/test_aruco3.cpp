@@ -835,13 +835,10 @@ void Launch_Crow_WebServer(){
 
     crow::SimpleApp app; //define your crow application
     
-    //app.loglevel(crow::LogLevel::Debug); //Afficher différents niveaux de log
     std::cout << std::system("pwd") << std::endl;//Check the directory of the executable (from linux command "pwd")
     
     //define your endpoint at the root directory
     CROW_ROUTE(app, "/test")([]{ // 
-
-        //crow::mustache::context ctx;
         
         auto page = crow::mustache::load_text("view-stream.html"); //html page
     
@@ -889,7 +886,7 @@ void Launch_Crow_WebServer(){
             Threshold = std::stof(req.url_params.get("Threshold"));
         }
         
-        //Checking if we changed the zOffset of the tooltip (the position of the tooltipon the Z axis) through the slider. for translating the tool tip on the z axis as needed
+        //Checking if we changed the zOffset of the tooltip (the position of the tooltip on the Z axis) through the slider. for translating the tool tip on the z axis as needed
         if(req.url_params.get("zOffset") != nullptr )
         {
         	zOffset = std::stof(req.url_params.get("zOffset"));
@@ -913,7 +910,6 @@ void Launch_Crow_WebServer(){
 		         {"coordinates", crow::json::wvalue::list( { (double)std::get<1>(registeredPoints.back()).at<float>(0, 0) * 100, (double)std::get<1>(registeredPoints.back()).at<float>(1, 0) * 100, (double)std::get<1>(registeredPoints.back()).at<float>(2, 0) * 100 } )  }
 		         }); //On arrondis a la 3e décimale
 		         
-		         //crow::json::wvalue last_point( crow::json::wvalue::list( { std::get<1>(registeredPoints.back()).at<float>(0, 0) * 100, std::get<1>(registeredPoints.back()).at<float>(1, 0) * 100, std::get<1>(registeredPoints.back()).at<float>(2, 0) * 100 } ) );
 		        //Send response
 		        return crow::response( last_point );
             }
@@ -1444,16 +1440,13 @@ int main(int argc, char** argv)
     //Used for streaming video to web server
     //to hand opencv image by GStreamer
     cv::VideoWriter writer;
-    
-    //Pipeline for sending frames to server
-    //string pipeline = "appsrc ! videoconvert ! videoscale ! video/x-raw,width=960,height=540 ! x264enc bitrate=256 ! video/x-h264,profile=\"high\" ! mpegtsmux ! hlssink playlist-root=http://10.5.83.185:8080 location=/home/rddoga/Desktop/hlstest/segment_%05d.ts playlist-location=/home/rddoga/Desktop/hlstest/playlist.m3u8 target-duration=5 max-files=5 ";
 
     //GStreamer pipeline for sending and encoding images to server
     string out = "appsrc ! videoconvert ! videoscale ! video/x-raw, framerate=24/1 ! avenc_mpeg1video bitrate=1500000 ! mpegtsmux ! curlhttpsink location=http://127.0.0.1:8080/rddoga";
     
     //
     int codec = cv::VideoWriter::fourcc('P','I','M','1');
-    cv::Size frame_size(480, 320);
+    cv::Size frame_size(640, 480);
     double fps = 24.0;
     
     //open the writer
@@ -1476,7 +1469,7 @@ int main(int argc, char** argv)
     //MDetector.setDetectionMode(aruco::DM_NORMAL);
     
     
-    //Changing manually the parameters of the detector
+    //Changing manually the parameters of the detector (if needed)
     aruco::MarkerDetector::Params &params= MDetector.getParameters();
     
     /*params.cornerRefinementM = aruco::CORNER_LINES; //Corner refinement method
@@ -1569,6 +1562,7 @@ int main(int argc, char** argv)
     }
 #endif        
 
+	//For knowing if the current image has already been processed (With the New camera)
     int Current_Image = 0;
     
     /////Timers
@@ -1701,7 +1695,7 @@ int main(int argc, char** argv)
         }
         
         
-        //Check if we can find the relative markermap
+        //Check if we can find the relative markermap (IF not static mode)
         if(!IsStatic){
             if(MMRelativeTracker.estimatePose(markers) ){
                 OneRelativeMarkerValid = true;
@@ -2045,7 +2039,7 @@ int main(int argc, char** argv)
         //cv::imshow("Thresh", imageBin);
         
 #else //If we are sending to the server        
-        cv::Mat imgPrint = cv::Mat(320, 480, CV_8UC3);            
+        cv::Mat imgPrint = cv::Mat(480, 640, CV_8UC3);            
         //resize down for printing the image on the client
         
         //Checking if we want to output video to the server

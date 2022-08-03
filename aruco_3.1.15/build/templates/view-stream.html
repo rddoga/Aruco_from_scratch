@@ -5,240 +5,275 @@
   <meta charset="UTF-8"></meta>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"></meta>
   <style>
-  /*.slidecontainer {
-	width: 100px;
-  }*/
-  .slider {
-	width: 400px;
-  }
+  
+.slider {
+  width: 400px;
+}
+.split {
+  height: 100%;
+  width: 50%;
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  overflow-x: hidden;
+  padding-top: 20px;
+}
+
+.left {
+  left: 0;
+  background-color: #FFFAFA;
+}
+
+.right {
+  right: 0;
+}
+
   </style>
   <title>JSMpeg Stream Client</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/picnic"> </link>
   
 </head>
+
+
 <body>
-  
 
-<div class="tabs three">
-  <input id='tab-1' type='radio' name='tabgroupB' checked="checked" />
-  <label class="pseudo button toggle" for="tab-1">Video Stream</label>
-  <input id='tab-2' type='radio' name='tabgroupB' />
-  <label class="pseudo button toggle" for="tab-2">Points</label>
-  <input id='tab-3' type='radio' name='tabgroupB' />
-  <label class="pseudo button toggle" for="tab-3">Tab 3</label>
-  <div class="row">
-<!--First Tab for Video Streaming-->
-    <div>
-        <h1>Video Streaming with GStreamer and WebSocket</h1>
-        
-        <div class="flex two demo" style="padding:20px">
-          <div>
-            
-          	<!--<canvas id="video-canvas" width="640" height="480" style="float:left; border:2px solid green"></canvas> -->
-    
-          </div>
-          	
-           <div>
-             <article class="card" style="padding:10px" > 
-          	    <input type="radio" id="Real Image" name="output" value="Real" onchange="sendDataRadio()" checked="checked" />
-		        <label for="Real Image" class="checkable">Real Image</label><br />
-		        <input type="radio" id="Binary Image" name="output" value="Bin" onchange="sendDataRadio()"/>
-		        <label for="Binary Image" class="checkable">Binary Image</label><br />
-		        <input type="radio" id="No Image" name="output" value="Inactive" onchange="sendDataRadio()"/>
-		        <label for="No Image" class="checkable">No Video</label><br /> 
-      	    </article>
-		 
-		<!--  <form action="/test" method="get" >
-		    <input type="radio" id="Real Image" name="output" value="Real">
-		    <label for="Real Image">Real Image</label><br>
-		    <input type="radio" id="Binary Image" name="output" value="Bin">
-		    <label for="Binary Image">Binary Image</label><br>
-		    <input type="submit" value="Submit">
-		  </form>-->
-		  
-              <article class="card" style="padding:20px" > 
-	        <!--<p id="test"> R </p>-->
-		    	<div id="SliderChange"> Tooltip zOffset</div>
-			    <input type="range" class="slider" id="zOffset" name="zOffset" min="0" max="2000" step="1" value="350" onchange="updateSlider(this.value, this.name)" oninput="num.value = this.value"/>
-				<output id="num">350</output> 
-			 
-			    <div id="SliderChange"> Exposure Time </div>
-			    <input type="range" class="slider" id="ExposureTime" name="Exposure_Time" min="1000" max="15000" step="1000" onchange="updateSlider(this.value, this.name)"/>
-			  
-			    <div id="SliderChange"> Gain </div>
-			    <input type="range" class="slider" id="Gain" name="Gain" min="0" max="27" step="1" onchange="updateSlider(this.value, this.name)"/>
-			  
-			    <div id="SliderChange"> Threshold </div>
-			    <input type="range" class="slider" id="Thresh" name="Threshold" min="0" max="255" step="1" onchange="updateSlider(this.value, this.name)"/>
-			    
-			  </article>
-          </div>
-        
-		</div>
-    </div>
+<!-- Left side of the screen -->
+<div class="split left" style="padding-left:20px"> 
+  <h1>Video Streaming with GStreamer and WebSocket</h1>
 
-<!--Second tab for Point registration/detection -->
-    <div>
+	<div>
+		        
+	  <canvas id="video-canvas" width="640" height="480" style="float:left; border:2px solid black"></canvas> 
 
-     
-      <div class="flex two demo" style="padding:20px">
-      
-     <!--For diplaying video --> 
-        <div>
-          <article class="card" > 
-            <header> VIDEO </header>   
-            <section>  
-              <canvas id="video-canvas" width="480" height="320" style="border:2px solid green"></canvas>  <!---->
-            </section> 
-          </article>
-        </div>
-        
-     <!--For displaying point coordinates -->    
-        <div>
-          <article class="card" > 
-            <header> REGISTERED POINTS </header>   
-                <table class="primary">
-                  <thead>
-                    <tr>
-                      <th>Point ID</th>
-                      <th>Coordinates</th>
-                      <th>X Error Margin </th>
-                      <th>Y Error Margin </th>
-                      <th>Z Error Margin </th><!---->
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr id="P1" hidden="hidden">
-                      <td>1</td>
-                      <td id="coord1">Paris, Fr </td>
-                      <td id="Xerror1">[ErrX]</td>
-                      <td id="Yerror1">[ErrY]</td>
-                      <td id="Zerror1">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P2" hidden="hidden">
-                      <td>2</td>
-                      <td id="coord2">San Francisco, USA</td>
-                      <td id="Xerror2">[ErrX]</td>
-                      <td id="Yerror2">[ErrY]</td>
-                      <td id="Zerror2">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P3" hidden="hidden">
-                      <td>3</td>
-                      <td id="coord3">New York, USA</td>
-                      <td id="Xerror3">[ErrX]</td>
-                      <td id="Yerror3">[ErrY]</td>
-                      <td id="Zerror3">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P4" hidden="hidden">
-                      <td>4</td>
-                      <td id="coord4">London, UK</td>
-                      <td id="Xerror4">[ErrX]</td>
-                      <td id="Yerror4">[ErrY]</td>
-                      <td id="Zerror4">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P5" hidden="hidden">
-                      <td>5</td>
-                      <td id="coord5">London, UK</td>
-                      <td id="Xerror5">[ErrX]</td>
-                      <td id="Yerror5">[ErrY]</td>
-                      <td id="Zerror5">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P6" hidden="hidden">
-                      <td>5</td>
-                      <td id="coord6">London, UK</td>
-                      <td id="Xerror6">[ErrX]</td>
-                      <td id="Yerror6">[ErrY]</td>
-                      <td id="Zerror6">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P7" hidden="hidden">
-                      <td>5</td>
-                      <td id="coord7">London, UK</td>
-                      <td id="Xerror7">[ErrX]</td>
-                      <td id="Yerror7">[ErrY]</td>
-                      <td id="Zerror7">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P8" hidden="hidden">
-                      <td>5</td>
-                      <td id="coord8">London, UK</td>
-                      <td id="Xerror8">[ErrX]</td>
-                      <td id="Yerror8">[ErrY]</td>
-                      <td id="Zerror8">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P9" hidden="hidden">
-                      <td>5</td>
-                      <td id="coord9">London, UK</td>
-                      <td id="Xerror9">[ErrX]</td>
-                      <td id="Yerror9">[ErrY]</td>
-                      <td id="Zerror9">[ErrZ]</td><!---->
-                    </tr>
-                    <tr id="P10" hidden="hidden">
-                      <td>5</td>
-                      <td id="coord10">London, UK</td>
-                      <td id="Xerror10">[ErrX]</td>
-                      <td id="Yerror10">[ErrY]</td>
-                      <td id="Zerror10">[ErrZ]</td><!---->
-                    </tr>
-                  </tbody>
-                </table>
-            <section> </section>
-          </article>
-        </div>
-        
-    <!--For Detecting Points -->    
-        <div>
-          <article class="card" > 
-            <header> DETECTED POINT </header>  
-            
-            <section>
-              <strong id="DetectedPoint" style="color:red;font-size:50px;padding:50px;">No Point Detected </strong>
-              
-             <!-- <button class="error" onclick="clearInterval(myVar)">Stop detecting</button> -->
-              
-            </section>
-          </article>
-        </div>
-        
-    <!--For Registering/Erasing points -->   
-        <div>
-          <article class="card" > 
-            <header> ACTIONS </header> 
-            
-            <section style="padding-left:20px">
-            
-              <div class="flex five demo" >
-                <div><button id="Origin" class='success' onclick="sendDataBasis('RegOrigin')">Register Origin</button></div>
-                <div><button id="XAxis" class='success' onclick="sendDataBasis('RegXAxis')">Place X axis</button></div>
-                <div><button id="YAxis" class='success' onclick="sendDataBasis('RegYAxis')">Place Y axis</button></div>
-                <div class="off-fifth"><button id="Restart" onclick="sendData('RestartAll')">Restart over</button></div>
-              </div>
-              <div class="flex two demo" >
-                <div>
-                  <button onclick="sendData('RegPoint')">Register Point</button>
-                
-                  <button class='warning' onclick="sendData('RegErrMarginX')">Register X error</button>
-                  <button class='warning' onclick="sendData('RegErrMarginY')">Register Y error</button>
-                  <button class='warning' onclick="sendData('RegErrMarginZ')">Register Z error</button>
-                </div>
-                <div align="right"><button class='error' onclick="sendData('RemoveLastP')">Remove last registered</button></div>    
-              </div>
-            </section> 
-          </article>
-        </div>
-    
-        
-      </div>
-    </div>
-
-<!-- Third tab for ... -->
-    <div>
-      
-    </div>
-    
-  </div>
-  
+	</div>
 </div>
 
+<!-- Right side of the screen -->
+<div class="split right">
+	<div class="tabs three">
+	  <input id='tab-1' type='radio' name='tabgroupB' checked="checked" />
+	  <label class="pseudo button toggle" for="tab-1">Video Stream</label>
+	  <input id='tab-2' type='radio' name='tabgroupB' />
+	  <label class="pseudo button toggle" for="tab-2">Points</label>
+	  <input id='tab-3' type='radio' name='tabgroupB' />
+	  <label class="pseudo button toggle" for="tab-3">Detection</label>
+	  <div class="row">
+	<!--First Tab for Video Streaming-->
+			<div>
+				  <!--<h1>Video Streaming with GStreamer and WebSocket</h1>-->
+				  
+			  <div class="flex two demo" style="padding:20px">
+			    
+			    <div>
+				    <article class="card" style="padding:10px" > 
+							<input type="radio" id="Real Image" name="output" value="Real" onchange="sendDataRadio()" checked="checked" />
+							<label for="Real Image" class="checkable">Real Image</label><br />
+							<input type="radio" id="Binary Image" name="output" value="Bin" onchange="sendDataRadio()"/>
+							<label for="Binary Image" class="checkable">Binary Image</label><br />
+							<input type="radio" id="No Image" name="output" value="Inactive" onchange="sendDataRadio()"/>
+							<label for="No Image" class="checkable">No Video</label><br /> 
+					  </article>
+					</div>
+					
+					<div>
+				    <article class="card" style="padding:10px" > 
+				      
+						<div id="SliderChange"> Tooltip zOffset</div>
+						<input type="range" class="slider" id="zOffset" name="zOffset" min="0" max="2000" step="1" value="350" onchange="updateSlider(this.value, this.name)" oninput="num.value = this.value"/>
+						<output id="num">350</output> 
+					 
+						<div id="SliderChange"> Exposure Time </div>
+						<input type="range" class="slider" id="ExposureTime" name="Exposure_Time" min="1000" max="15000" step="1000" onchange="updateSlider(this.value, this.name)"/>
+						
+						<div id="SliderChange"> Gain </div>
+						<input type="range" class="slider" id="Gain" name="Gain" min="0" max="27" step="1" onchange="updateSlider(this.value, this.name)"/>
+						
+						<div id="SliderChange"> Threshold </div>
+						<input type="range" class="slider" id="Thresh" name="Threshold" min="0" max="255" step="1" onchange="updateSlider(this.value, this.name)"/>
+					
+						</article>
+			  
+			  	</div>
+			  	
+				</div>
+			</div>
+
+		<!--Second tab for Point registration/detection -->
+			<div style="padding:20px">
+
+			 
+				<!--<div class="flex two demo" style="padding:20px">
+				
+			 For diplaying video 
+				  <div>
+				    <article class="card" > 
+				      <header> VIDEO </header>   
+				      <section>  
+				        <canvas id="video-canvas" width="480" height="320" style="border:2px solid green"></canvas>
+				      </section> 
+				    </article>
+				  </div>--> 
+	  
+				  
+			<!--For Registering/Erasing points -->   
+				  <div>
+				    <article class="card" > 
+				      <header> ACTIONS </header> 
+				      
+				      <section style="padding-left:20px">
+				      
+				        <div class="flex five demo" >
+				          <div><button id="Origin" class='success' onclick="sendDataBasis('RegOrigin')">Register Origin</button></div>
+				          <div><button id="XAxis" class='success' onclick="sendDataBasis('RegXAxis')">Place X axis</button></div>
+				          <div><button id="YAxis" class='success' onclick="sendDataBasis('RegYAxis')">Place Y axis</button></div>
+				          <div class="off-fifth"><button id="Restart" onclick="sendData('RestartAll')">Restart over</button></div>
+				        </div>
+				        <div class="flex two demo" >
+				          <div>
+				            <button onclick="sendData('RegPoint')">Register Point</button>
+				          </div>
+				          <div align="right">
+				          	<button class='error' onclick="sendData('RemoveLastP')">Remove last registered</button>
+				          </div>
+				        </div> 
+			          <div>
+			          	<button class='warning' onclick="sendData('RegErrMarginX')">Register X error</button>
+			            <button class='warning' onclick="sendData('RegErrMarginY')">Register Y error</button>
+			            <button class='warning' onclick="sendData('RegErrMarginZ')">Register Z error</button>
+			          </div>
+
+				      </section> 
+				    </article>
+				  </div>
+				  
+				  	  
+			 <!--For displaying point coordinates (10 points MAX For now) -->    
+				  <div>
+				  
+				    <article class="card" > 
+				    
+				      <header> REGISTERED POINTS </header>   
+		          <table class="primary">
+		            <thead>
+		              <tr>
+		                <th>Point ID</th>
+		                <th style="width:35%">Coordinates</th>
+		                <th>X Error Margin </th>
+		                <th>Y Error Margin </th>
+		                <th>Z Error Margin </th><!---->
+		              </tr>
+		            </thead>
+		            <tbody>
+		              <tr id="P1" hidden="hidden">
+		                <td>1</td>
+		                <td id="coord1">[P1] </td>
+		                <td id="Xerror1">[ErrX]</td>
+		                <td id="Yerror1">[ErrY]</td>
+		                <td id="Zerror1">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P2" hidden="hidden">
+		                <td>2</td>
+		                <td id="coord2">[P2]</td>
+		                <td id="Xerror2">[ErrX]</td>
+		                <td id="Yerror2">[ErrY]</td>
+		                <td id="Zerror2">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P3" hidden="hidden">
+		                <td>3</td>
+		                <td id="coord3">[P3]</td>
+		                <td id="Xerror3">[ErrX]</td>
+		                <td id="Yerror3">[ErrY]</td>
+		                <td id="Zerror3">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P4" hidden="hidden">
+		                <td>4</td>
+		                <td id="coord4">[P4]</td>
+		                <td id="Xerror4">[ErrX]</td>
+		                <td id="Yerror4">[ErrY]</td>
+		                <td id="Zerror4">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P5" hidden="hidden">
+		                <td>5</td>
+		                <td id="coord5">[P5]</td>
+		                <td id="Xerror5">[ErrX]</td>
+		                <td id="Yerror5">[ErrY]</td>
+		                <td id="Zerror5">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P6" hidden="hidden">
+		                <td>5</td>
+		                <td id="coord6">[P6]</td>
+		                <td id="Xerror6">[ErrX]</td>
+		                <td id="Yerror6">[ErrY]</td>
+		                <td id="Zerror6">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P7" hidden="hidden">
+		                <td>5</td>
+		                <td id="coord7">[P7]</td>
+		                <td id="Xerror7">[ErrX]</td>
+		                <td id="Yerror7">[ErrY]</td>
+		                <td id="Zerror7">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P8" hidden="hidden">
+		                <td>5</td>
+		                <td id="coord8">[P8]</td>
+		                <td id="Xerror8">[ErrX]</td>
+		                <td id="Yerror8">[ErrY]</td>
+		                <td id="Zerror8">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P9" hidden="hidden">
+		                <td>5</td>
+		                <td id="coord9">[P9]</td>
+		                <td id="Xerror9">[ErrX]</td>
+		                <td id="Yerror9">[ErrY]</td>
+		                <td id="Zerror9">[ErrZ]</td><!---->
+		              </tr>
+		              <tr id="P10" hidden="hidden">
+		                <td>5</td>
+		                <td id="coord10">[P10]</td>
+		                <td id="Xerror10">[ErrX]</td>
+		                <td id="Yerror10">[ErrY]</td>
+		                <td id="Zerror10">[ErrZ]</td><!---->
+		              </tr>
+		            </tbody>
+		          </table>
+				    </article>
+				    
+				  </div>
+				  
+			<!--For Detecting Points -->    
+				  <div>
+				    
+				  </div>
+				  	
+				  
+				<!--</div>-->
+			</div>
+
+		<!-- Third tab for ... -->
+			<div style="padding:20px">
+				<article class="card" > 
+		      <header> DETECTED POINT </header>  
+		      
+		      <section>
+		        <strong id="DetectedPoint" style="color:red;font-size:50px;font-family:Arial;padding:50px;">No Point Detected </strong>
+		        
+		       <!-- <button class="error" onclick="clearInterval(myVar)">Stop detecting</button> -->
+		        
+		      </section>
+		    </article>
+			</div>
+		
+	  </div>
+	  
+	</div>
+	
+</div>
+
+
+<!--------------------------------------
+--------------SCRIPTS-------------------
+---------------------------------------->
 
   <!--For displaying the image-->
   <script type="text/javascript" src="static/jsmpeg.min.js"></script>
@@ -279,16 +314,8 @@ function sendDataRadio() {
   
   // Finalement, envoyez les données.
   XHR.send();
-  
-  
-  ////////////Sending with Post :
-  // Configurez la requête (POST)
-  //XHR.open('POST', '/DataEx');
-  // Ajoutez l'en-tête HTTP requise pour requêtes POST de données de formulaire (IF SENDING WITH POST)
-  //XHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-  // Finalement, envoyez les données.
-  //XHR.send(urlEncodedData);
-  
+
+  //Hide the video if "No Video" selected on the radio button
   if(getSelectedValue.value == "Inactive" ){
     canvas.setAttribute("hidden","hidden");
   }
@@ -298,14 +325,6 @@ function sendDataRadio() {
 }
 
   </script>
-  
-  				<!-- <input type="radio" id="Real Image" name="output" value="Real" checked="checked" />
-		        <label for="Real Image" class="checkable">Real Image</label><br />
-		        <input type="radio" id="Binary Image" name="output" value="Bin" />
-		        <label for="Binary Image" class="checkable">Binary Image</label><br />
-		        <input type="radio" id="No Image" name="output" value="Inactive" />
-		        <label for="No Image" class="checkable">No Video</label><br />
-		        <button onclick="sendDataRadio()">Change View</button> -->
 
   
   <!-- Script executed on slider update -->
@@ -358,7 +377,6 @@ function sendDataBasis(Step) {
   //Function that will catch the response from the server
   XHR.onreadystatechange = function() {
     console.log("onreadystatechange - XHR.responseText: " + XHR.responseText);
-    //document.getElementById("test").innerHTML = XHR.responseText;
     
     //If we just registered the origin, register the X axis (display info in button text)
     if(XHR.responseText == 1){
@@ -430,21 +448,17 @@ function sendData(type) {
 	  
 	  //Adding X error margin to the table
 	  else if(ResReceived.action === "addition X err"){
-	    //document.getElementById("error" + ResReceived.id).innerHTML = ResReceived.errorMargin;
+	    
 	    document.getElementById("Xerror" + ResReceived.id).innerHTML = ResReceived.errorMarginX.toFixed(2);
 	  }
 	  //Adding Y error margin to the table
 	  else if(ResReceived.action === "addition Y err"){
-	    //document.getElementById("error" + ResReceived.id).innerHTML = ResReceived.errorMargin;
-	   // var text = document.createTextNode("; " + ResReceived.errorMarginY);
-	    //document.getElementById("error" + ResReceived.id).appendChild(text);
+	    
 	    document.getElementById("Yerror" + ResReceived.id).innerHTML = ResReceived.errorMarginY.toFixed(2);
 	  }
 	  //Adding Z error margin to the table
 	  else if(ResReceived.action === "addition Z err"){
-	    //document.getElementById("error" + ResReceived.id).innerHTML = ResReceived.errorMargin;
-	    //var text = document.createTextNode("; " + ResReceived.errorMarginZ + " )");
-	    ////document.getElementById("error" + ResReceived.id).appendChild(text);
+	    
 	    document.getElementById("Zerror" + ResReceived.id).innerHTML = ResReceived.errorMarginZ.toFixed(2);
 	  }
 	  
@@ -483,10 +497,6 @@ function sendData(type) {
 	  }
 
 	}
-	
-	/*if(type == 'RestartAll'){
-		
-	}*/
 	
 	/////////////Sending with Get :
 	// Configurez la requête (GET)
@@ -527,7 +537,6 @@ function sendDetectedCheck() {
   //Function that will catch the response from the server
   XHR.onreadystatechange = function() {
     console.log("onreadystatechange - XHR.responseText: " + XHR.response);
-    //document.getElementById("test").innerHTML = XHR.response;
     
 	//Stop if the response is empty
 	if(XHR.response === ""){
